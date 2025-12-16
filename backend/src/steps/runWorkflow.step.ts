@@ -1,4 +1,4 @@
-import "../models";
+import "../models/index.js";
 import { ApiRouteConfig, StepHandler } from "motia";
 import Workflow from "../models/workflow.model";
 import PublishedApi from "../models/publishedApi.model";
