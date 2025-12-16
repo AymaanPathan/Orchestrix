@@ -21,20 +21,20 @@ import { Sidebar } from "@/components/Ui/Sidebar";
 import ExecutionLogsSidebar from "@/components/Ui/ExecutionLogsSidebar";
 import SaveWorkflowModal from "@/components/workflow/SaveWorkflowModal";
 
-import { createNode } from "@/workflow/nodes/addNode";
-import { saveNodeChanges } from "@/workflow/nodes/saveNode";
+import { createNode } from "@/components/workflow/nodes/addNode";
+import { saveNodeChanges } from "@/components/workflow/nodes/saveNode";
 
-import { buildForSave } from "@/workflow/build/buildForSave";
-import { buildForExecute } from "@/workflow/build/buildForExecute";
+import { buildForSave } from "@/components/workflow/build/buildForSave";
+import { buildForExecute } from "@/components/workflow/build/buildForExecute";
 
-import { handleOnConnect } from "@/workflow/nodes/onConnect";
+import { handleOnConnect } from "@/components/workflow/nodes/onConnect";
 import { getExecutionOrder } from "@/utils/topoOrder";
 import { calcStepNumbers } from "@/utils/calcStepNumbers";
-import { buildGraphMeta } from "@/workflow/validation/buildGraph";
-import { validateGraph } from "@/workflow/validation/validateGraph";
+import { buildGraphMeta } from "@/components/workflow/validation/buildGraph";
+import { validateGraph } from "@/components/workflow/validation/validateGraph";
 import { RootDispatch, RootState } from "@/store";
 import { useDispatch, useSelector } from "react-redux";
-import AnimatedDashedEdge from "./AnimatedDashedEdge";
+import AnimatedDashedEdge from "@/components/Ui/AnimatedDashedEdge";
 
 export default function WorkflowPage() {
   const [graphMeta, setGraphMeta] = useState<any>(null);

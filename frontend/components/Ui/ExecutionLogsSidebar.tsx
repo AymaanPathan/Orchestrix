@@ -6,7 +6,6 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
-  Play,
   Loader2,
   AlertCircle,
   Terminal,
