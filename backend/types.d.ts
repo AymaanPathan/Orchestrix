@@ -18,6 +18,7 @@ declare module 'motia' {
     'saveWorkflow': ApiRouteHandler<Record<string, unknown>, unknown, never>
     'models.bootstrap': EventHandler<never, { topic: 'workflow.run'; data: never }>
     'executeWorkflow': ApiRouteHandler<Record<string, unknown>, unknown, never>
+    'delay': EventHandler<never, never>
     'dbUpdate': EventHandler<never, { topic: 'workflow.run'; data: never }>
     'dbInsert': EventHandler<never, { topic: 'workflow.run'; data: never }>
     'dbFind': EventHandler<never, { topic: 'workflow.run'; data: never }>
