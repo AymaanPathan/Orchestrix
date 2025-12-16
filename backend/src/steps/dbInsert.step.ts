@@ -1,6 +1,8 @@
 import { EventConfig, StepHandler } from "motia";
 import { connectMongo } from "../lib/mongo";
-import users from "../models/user.model";
+import mongoose from "mongoose";
+
+const users =mongoose.connection.models["users"];
 import bcrypt from "bcryptjs";
 
 export const config: EventConfig = {

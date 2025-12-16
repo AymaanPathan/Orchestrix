@@ -28,7 +28,7 @@ export const handler: StepHandler<typeof config> = async (req, ctx) => {
   };
 
   await ctx.emit({
-    topic: "workflow.run",
+    topic: "workflow.start",
     data: {
       steps,
       index: 0,

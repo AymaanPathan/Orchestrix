@@ -1,7 +1,9 @@
 import { EventConfig, StepHandler } from "motia";
 import jwt from "jsonwebtoken";
 import { connectMongo } from "../lib/mongo";
-import users from "../models/user.model";
+import mongoose from "mongoose";
+
+const users = mongoose.connection.models["users"];
 
 export const config: EventConfig = {
   name: "authMiddleware",
