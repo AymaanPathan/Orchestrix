@@ -6,7 +6,7 @@ import users from "../models/user.model";
 export const config: EventConfig = {
   name: "authMiddleware",
   type: "event",
-  subscribes: ["authMiddleware"], // ⭐ step.type
+  subscribes: ["authMiddleware"],
   emits: ["workflow.run"],
 };
 
