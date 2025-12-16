@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { BaseNodeEditor } from "./BaseNodeEditor";
-import { useNodeConfigs } from "@/nodeConfigs";
+import { useNodeConfigs } from "../workflow/build/nodeConfigs";
 
 export default function NodeEditorModal({
   selectedNode,

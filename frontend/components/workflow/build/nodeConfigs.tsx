@@ -2,8 +2,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useSelector } from "react-redux";
-import { RootState } from "./store";
-import { findSchema } from "./utils/findSchemaForCollection.utils";
+import { RootState } from "../../../store";
+import { findSchema } from "../../../utils/findSchemaForCollection.utils";
 import { Plus, Trash2, Filter, Edit3, Shield } from "lucide-react";
 
 /* ---------------------------------------------------
