@@ -12,7 +12,6 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
 
   const step = steps[index];
 
-  // 🏁 Workflow done
   if (!step) {
     await ctx.emit({
       topic: "workflow.finished",
@@ -21,9 +20,8 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
     return;
   }
 
-  // 🔥 Delegate to step type
   await ctx.emit({
-    topic: step.type, // dbFind, dbInsert, etc
+    topic: step.type,
     data: {
       step,
       steps,

@@ -29,7 +29,6 @@ export const handler: StepHandler<typeof config> = async (req, ctx) => {
     executionId,
   };
 
-  // 🔥 START THE WORKFLOW (IMPORTANT LINE)
   await ctx.emit({
     topic: "workflow.run",
     data: {

@@ -21,6 +21,8 @@
     "@motiadev/plugin-logs": "^0.17.6-beta.187",
     "@motiadev/plugin-observability": "^0.17.6-beta.187",
     "@motiadev/plugin-states": "^0.17.6-beta.187",
+    "bcryptjs": "^3.0.3",
+    "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.0.1",
     "motia": "^0.17.6-beta.187",
     "zod": "^4.1.12"
