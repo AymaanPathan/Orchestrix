@@ -1,6 +1,9 @@
 import mongoose from "mongoose";
-import { sendEmail } from "./lib/email";
-import { resolveObjectTemplates, resolveTemplate } from "../flows/templateResolver";
+import { sendEmail } from "../lib/email";
+import {
+  resolveObjectTemplates,
+  resolveTemplate,
+} from "../flows/templateResolver";
 
 export async function runEngine(steps: any[], input: any, headers: any = {}) {
   const vars: Record<string, any> = {};
@@ -256,7 +259,6 @@ export async function runEngine(steps: any[], input: any, headers: any = {}) {
       const to = resolveTemplate(step.to, vars);
       const subject = resolveTemplate(step.subject, vars);
       const body = resolveTemplate(step.body, vars);
-
 
       const result = await sendEmail({ to, subject, body });
 

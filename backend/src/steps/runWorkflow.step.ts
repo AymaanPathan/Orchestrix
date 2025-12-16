@@ -3,7 +3,7 @@ import { ApiRouteConfig, StepHandler } from "motia";
 import Workflow from "../models/workflow.model";
 import PublishedApi from "../models/publishedApi.model";
 import { connectMongo } from "../lib/mongo";
-import { runEngine } from "../workflowEngine";
+import { runEngine } from "../lib/workflowEngine";
 
 export const config: ApiRouteConfig = {
   name: "runWorkflowPublic",

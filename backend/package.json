@@ -25,6 +25,7 @@
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.0.1",
     "motia": "^0.17.6-beta.187",
+    "nodemailer": "^7.0.11",
     "zod": "^4.1.12"
   },
   "devDependencies": {
