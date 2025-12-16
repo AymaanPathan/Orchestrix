@@ -3,7 +3,7 @@
 
 import { Handle, Position } from "@xyflow/react";
 import StepBadge from "./StepBadge";
-import { useWorkflowActions } from "../../useWorkflowActions";
+import { useWorkflowActions } from "@/assets/useWorkflowActions"; 
 
 export interface BaseNodeProps {
   id?: string;
