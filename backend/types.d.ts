@@ -12,9 +12,16 @@ declare module 'motia' {
   }
 
   interface Handlers {
+    'workflow.log.persist': EventHandler<never, never>
+    'workflow.finished': EventHandler<never, { topic: 'workflow.log.persist'; data: never }>
+    'workflow.run': EventHandler<never, { topic: 'workflow.run'; data: never } | { topic: 'workflow.finished'; data: never }>
+    'executeWorkflow': ApiRouteHandler<Record<string, unknown>, unknown, never>
+    'dbUpdate': EventHandler<never, { topic: 'workflow.run'; data: never }>
+    'dbInsert': EventHandler<never, { topic: 'workflow.run'; data: never }>
+    'dbFind': EventHandler<never, { topic: 'workflow.run'; data: never }>
+    'authMiddleware': EventHandler<never, { topic: 'workflow.run'; data: never }>
     'ProcessGreeting': EventHandler<{ timestamp: string; appName: string; greetingPrefix: string; requestId: string }, never>
     'HelloAPI': ApiRouteHandler<Record<string, unknown>, ApiResponse<200, { message: string; status: string; appName: string }>, { topic: 'process-greeting'; data: { timestamp: string; appName: string; greetingPrefix: string; requestId: string } }>
-    'workflow.run': EventHandler<never, { topic: 'workflow.run'; data: never }>
   }
     
 }

@@ -1,4 +1,3 @@
-import "../models";
 import { ApiRouteConfig, StepHandler } from "motia";
 import { connectMongo } from "../lib/mongo";
 import { v4 as uuidv4 } from "uuid";
@@ -14,7 +13,6 @@ export const config: ApiRouteConfig = {
 
 export const handler: StepHandler<typeof config> = async (req, ctx) => {
   await connectMongo();
-
   const { steps, input } = req.body;
 
   if (!Array.isArray(steps)) {
