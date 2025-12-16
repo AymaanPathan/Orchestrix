@@ -1,9 +1,11 @@
 import mongoose from "mongoose";
+import jwt from "jsonwebtoken";
 import { sendEmail } from "../lib/email";
 import {
   resolveObjectTemplates,
   resolveTemplate,
 } from "../flows/templateResolver";
+import bcryptjs from "bcryptjs";
 
 export async function runEngine(steps: any[], input: any, headers: any = {}) {
   const vars: Record<string, any> = {};
@@ -54,8 +56,7 @@ export async function runEngine(steps: any[], input: any, headers: any = {}) {
 
       // 🔥 Hash password if provided
       if (data.password) {
-        const bcrypt = require("bcryptjs");
-        data.password = await bcrypt.hash(data.password, 10);
+        data.password = await bcryptjs.hash(data.password, 10);
       }
 
       const created = await Model.create(data);
@@ -135,7 +136,6 @@ export async function runEngine(steps: any[], input: any, headers: any = {}) {
       }
 
       const token = authHeader.split(" ")[1];
-      const jwt = require("jsonwebtoken");
 
       try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -219,8 +219,7 @@ export async function runEngine(steps: any[], input: any, headers: any = {}) {
       }
 
       // Compare password using bcrypt
-      const bcrypt = require("bcryptjs");
-      const match = await bcrypt.compare(password, user.password);
+      const match = await bcryptjs.compare(password, user.password);
 
       if (!match) {
         logs.push({
