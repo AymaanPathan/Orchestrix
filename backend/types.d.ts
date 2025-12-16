@@ -15,6 +15,7 @@ declare module 'motia' {
     'workflow.log.persist': EventHandler<never, never>
     'workflow.finished': EventHandler<never, { topic: 'workflow.log.persist'; data: never }>
     'workflow.run': EventHandler<never, { topic: 'workflow.run'; data: never } | { topic: 'workflow.finished'; data: never }>
+    'saveWorkflow': ApiRouteHandler<Record<string, unknown>, unknown, never>
     'models.bootstrap': EventHandler<never, { topic: 'workflow.run'; data: never }>
     'executeWorkflow': ApiRouteHandler<Record<string, unknown>, unknown, never>
     'dbUpdate': EventHandler<never, { topic: 'workflow.run'; data: never }>
