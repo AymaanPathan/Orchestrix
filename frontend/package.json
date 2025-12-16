@@ -10,12 +10,16 @@
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.1.18",
+    "@xyflow/react": "^12.10.0",
+    "framer-motion": "^12.23.26",
+    "lucide-react": "^0.561.0",
     "next": "^15.5.9",
     "postcss": "^8.5.6",
     "react": "19.2.1",
     "react-dom": "19.2.1",
     "reactflow": "^11.11.4",
-    "tailwindcss": "^4.1.18"
+    "tailwindcss": "^4.1.18",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "@types/node": "^20",
