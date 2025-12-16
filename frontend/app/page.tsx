@@ -18,8 +18,8 @@ import { Menu, Play, Save, Workflow, Sparkles, ArrowRight } from "lucide-react";
 import { nodeTypes } from "@/components/nodes/NodesStore";
 import NodeEditorSidebar from "@/components/Ui/NodesSidebar";
 import { Sidebar } from "@/components/Ui/Sidebar";
-import ExecutionLogsSidebar from "@/components/ExecutionLogsSidebar";
-import SaveWorkflowModal from "@/workflow/SaveWorkflowModal";
+import ExecutionLogsSidebar from "@/components/Ui/ExecutionLogsSidebar";
+import SaveWorkflowModal from "@/components/workflow/SaveWorkflowModal";
 
 import { createNode } from "@/workflow/nodes/addNode";
 import { saveNodeChanges } from "@/workflow/nodes/saveNode";
