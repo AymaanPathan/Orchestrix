@@ -1,49 +1,37 @@
 import { EventConfig, StepHandler } from "motia";
+import mongoose from "mongoose";
 import { connectMongo } from "../lib/mongo";
-import userModel from "../models/user.model";
 
 export const config: EventConfig = {
   name: "dbFind",
   type: "event",
-  subscribes: ["workflow.run"],
-  emits: ["workflow.step.result"],
+  subscribes: ["dbFind"],
+  emits: ["workflow.run"],
 };
 
 export const handler: StepHandler<typeof config> = async (payload, ctx) => {
   await connectMongo();
 
-  const { logger, emit } = ctx;
-  const { findType, filters, output, input } = payload as any;
+  const { step, steps, index, vars, executionId } = payload as any;
 
-  const resolvedFilters: Record<string, any> = {};
+  const Model = mongoose.connection.models[step.collection];
+  if (!Model) throw new Error("Model not found: " + step.collection);
 
-  for (const key of Object.keys(filters)) {
-    const value = filters[key];
+  const result =
+    step.findType === "findOne"
+      ? await Model.findOne(step.filters)
+      : await Model.find(step.filters);
 
-    if (typeof value === "string" && value.startsWith("input.")) {
-      const inputKey = value.replace("input.", "");
-      resolvedFilters[key] = input?.[inputKey] ?? null;
-    } else {
-      resolvedFilters[key] = value;
-    }
-  }
-
-  logger.info("RESOLVED FILTERS", resolvedFilters);
-
-  let result;
-
-  if (findType === "findOne") {
-    result = await userModel.findOne(resolvedFilters);
-  } else {
-    result = await userModel.find(resolvedFilters);
-  }
-
-  logger.info("DB FIND RESULT", result);
-
-  await emit({
-    topic: "workflow.step.result",
+  await ctx.emit({
+    topic: "workflow.run",
     data: {
-      [output]: result,
+      steps,
+      index: index + 1,
+      vars: {
+        ...vars,
+        [step.output]: result,
+      },
+      executionId,
     },
   });
 };
