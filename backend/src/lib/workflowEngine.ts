@@ -7,6 +7,10 @@ import {
 } from "../flows/templateResolver";
 import bcryptjs from "bcryptjs";
 
+// Import models to ensure they're registered
+import "../models/user.model.js";
+import "../models/workflow.model.js";
+import "../models/publishedApi.model.js";
 export async function runEngine(steps: any[], input: any, headers: any = {}) {
   const vars: Record<string, any> = {};
   const logs: any[] = [];
@@ -31,7 +35,21 @@ export async function runEngine(steps: any[], input: any, headers: any = {}) {
     // 2️⃣ DB.FIND
     // -------------------------
     if (step.type === "dbFind") {
+      if (!step.collection) {
+        logs.push({ step: step.id, error: "Collection name is missing" });
+        continue;
+      }
+
       const Model = mongoose.connection.models[step.collection];
+
+      if (!Model) {
+        logs.push({
+          step: step.id,
+          error: `Model '${step.collection}' not found`,
+        });
+        continue;
+      }
+
       const filters = resolveObjectTemplates(step.filters, vars);
 
       const result =
@@ -47,11 +65,22 @@ export async function runEngine(steps: any[], input: any, headers: any = {}) {
     // -------------------------
     // 3️⃣ dbInsert
     // -------------------------
-    // -------------------------
-    // 3️⃣ dbInsert  (with password hashing)
-    // -------------------------
     if (step.type === "dbInsert") {
+      if (!step.collection) {
+        logs.push({ step: step.id, error: "Collection name is missing" });
+        continue;
+      }
+
       const Model = mongoose.connection.models[step.collection];
+
+      if (!Model) {
+        logs.push({
+          step: step.id,
+          error: `Model '${step.collection}' not found`,
+        });
+        continue;
+      }
+
       const data = resolveObjectTemplates(step.data, vars);
 
       // 🔥 Hash password if provided
@@ -70,7 +99,20 @@ export async function runEngine(steps: any[], input: any, headers: any = {}) {
     // 4️⃣ dbUpdate
     // -------------------------
     if (step.type === "dbUpdate") {
+      if (!step.collection) {
+        logs.push({ step: step.id, error: "Collection name is missing" });
+        continue;
+      }
+
       const Model = mongoose.connection.models[step.collection];
+
+      if (!Model) {
+        logs.push({
+          step: step.id,
+          error: `Model '${step.collection}' not found`,
+        });
+        continue;
+      }
 
       const filters = resolveObjectTemplates(step.filters, vars);
       const update = resolveObjectTemplates(step.update, vars);
@@ -93,7 +135,21 @@ export async function runEngine(steps: any[], input: any, headers: any = {}) {
     // 5️⃣ dbDelete
     // -------------------------
     if (step.type === "dbDelete") {
+      if (!step.collection) {
+        logs.push({ step: step.id, error: "Collection name is missing" });
+        continue;
+      }
+
       const Model = mongoose.connection.models[step.collection];
+
+      if (!Model) {
+        logs.push({
+          step: step.id,
+          error: `Model '${step.collection}' not found`,
+        });
+        continue;
+      }
+
       const filters = resolveObjectTemplates(step.filters, vars);
 
       const result =
@@ -115,6 +171,9 @@ export async function runEngine(steps: any[], input: any, headers: any = {}) {
       continue;
     }
 
+    // -------------------------
+    // 7️⃣ AUTH MIDDLEWARE
+    // -------------------------
     if (step.type === "authMiddleware") {
       const authHeader =
         headers?.authorization || headers?.Authorization || null;
@@ -168,9 +227,6 @@ export async function runEngine(steps: any[], input: any, headers: any = {}) {
       }
     }
 
-    /* ------------------------------------------------------- *
-     * 8️⃣ USER LOGIN
-     * ------------------------------------------------------- */
     // -------------------------
     // 8️⃣ USER LOGIN
     // -------------------------
@@ -251,8 +307,9 @@ export async function runEngine(steps: any[], input: any, headers: any = {}) {
 
       continue;
     }
+
     // -------------------------
-    // 7️⃣ EMAIL SEND
+    // 9️⃣ EMAIL SEND
     // -------------------------
     if (step.type === "emailSend") {
       const to = resolveTemplate(step.to, vars);

@@ -1,4 +1,7 @@
-import "../models/index.js";
+// Import models to ensure they're registered
+import "../models/user.model.js";
+import "../models/workflow.model.js";
+import "../models/publishedApi.model.js";
 import { ApiRouteConfig, StepHandler } from "motia";
 import Workflow from "../models/workflow.model";
 import PublishedApi from "../models/publishedApi.model";
@@ -18,7 +21,6 @@ export const handler: StepHandler<typeof config> = async (data, ctx) => {
   await connectMongo();
   const { logger } = ctx;
 
-  // 🔑 Path params (Motia provides this)
   const { workflowId, apiName } = data.pathParams || {};
 
   if (!workflowId) {
@@ -28,7 +30,6 @@ export const handler: StepHandler<typeof config> = async (data, ctx) => {
     };
   }
 
-  // (Optional but recommended) validate API exists
   const api = await PublishedApi.findOne({
     workflowId,
     slug: apiName,
@@ -41,7 +42,6 @@ export const handler: StepHandler<typeof config> = async (data, ctx) => {
     };
   }
 
-  // Load workflow
   const workflow = await Workflow.findOne({ workflowId });
   if (!workflow) {
     return {
@@ -50,7 +50,6 @@ export const handler: StepHandler<typeof config> = async (data, ctx) => {
     };
   }
 
-  // Input comes from body
   const input = { ...(data.body || {}) };
 
   logger.info("Running public workflow", {
