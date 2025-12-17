@@ -262,7 +262,7 @@ export default function WorkflowPage() {
     }
   };
 
-  // RUN WORKFLOW
+  const executingRef = useRef(false);
   const runWorkflow = async () => {
     try {
       validateGraph(nodes, edges, dbSchemas);
@@ -272,90 +272,25 @@ export default function WorkflowPage() {
     }
 
     const payload = buildForExecute(nodes, edges);
-
-    setLogs({ logs: [], executionId: null, finished: false });
-    setLogsOpen(true);
-
+    if (executingRef.current) return;
+    executingRef.current = true;
     const res = await fetch("http://localhost:3000/workflow/execute", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-
+    executingRef.current = false;
     const output = await res.json();
-    const executionId = output.executionId;
 
-    if (!executionId) {
-      console.error("❌ No executionId returned");
+    if (!output.executionId) {
+      console.error("❌ Execution failed:", output);
       return;
     }
 
-    console.log("🚀 Started workflow:", executionId);
+    console.log("✅ Workflow execution triggered");
+    console.log("🆔 Execution ID:", output.executionId);
 
-    let lastTimestamp = 0;
-    let isFinished = false;
-    let pollCount = 0;
-
-    const pollLogs = async () => {
-      if (isFinished) return;
-
-      pollCount++;
-
-      try {
-        const response = await fetch(
-          `http://localhost:3000/workflow/logs?executionId=${executionId}&after=${lastTimestamp}`
-        );
-
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-        const data = await response.json();
-
-        if (pollCount === 1 && data.allLogs) {
-          console.log(
-            `📊 Initial logs (${data.allLogs.length}):`,
-            data.allLogs
-          );
-          setLogs({
-            logs: data.allLogs,
-            executionId,
-            finished: data.finished,
-          });
-        } else if (data.logs && data.logs.length > 0) {
-          console.log(`➕ New logs (${data.logs.length}):`, data.logs);
-          setLogs((prev: any) => ({
-            ...prev,
-            logs: [...(prev?.logs || []), ...data.logs],
-            finished: data.finished,
-          }));
-        } else if (data.finished !== isFinished) {
-          setLogs((prev: any) => ({
-            ...prev,
-            finished: data.finished,
-          }));
-        }
-
-        lastTimestamp = data.timestamp;
-        isFinished = data.finished;
-
-        if (!isFinished) {
-          setTimeout(pollLogs, 300);
-        } else {
-          console.log("🏁 Workflow completed");
-        }
-      } catch (error: any) {
-        console.error(`❌ Poll error:`, error.message);
-
-        if (!isFinished) {
-          const delay = Math.min(
-            1000 * Math.pow(1.5, Math.floor(pollCount / 10)),
-            5000
-          );
-          setTimeout(pollLogs, delay);
-        }
-      }
-    };
-
-    pollLogs();
+    alert("Workflow executed. Check backend console / DB.");
   };
 
   // NODE SAVE HANDLER

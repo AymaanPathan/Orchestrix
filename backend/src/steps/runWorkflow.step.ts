@@ -24,44 +24,37 @@ export const handler: StepHandler<typeof config> = async (data, ctx) => {
   const { workflowId, apiName } = data.pathParams || {};
 
   if (!workflowId) {
-    return {
-      status: 400,
-      body: { error: "workflowId missing in path" },
-    };
+    return { status: 400, body: { error: "workflowId missing in path" } };
   }
 
-  const api = await PublishedApi.findOne({
-    workflowId,
-    slug: apiName,
-  });
-
+  const api = await PublishedApi.findOne({ workflowId, slug: apiName });
   if (!api) {
-    return {
-      status: 404,
-      body: { error: "API not published or invalid path" },
-    };
+    return { status: 404, body: { error: "API not published" } };
   }
 
   const workflow = await Workflow.findOne({ workflowId });
   if (!workflow) {
-    return {
-      status: 404,
-      body: { error: "Workflow not found" },
-    };
+    return { status: 404, body: { error: "Workflow not found" } };
   }
 
-  const input = { ...(data.body || {}) };
+  const executionId = crypto.randomUUID();
 
-  logger.info("Running public workflow", {
-    workflowId,
-    api: api.name,
-    input,
+  await ctx.emit({
+    topic: "workflow.start",
+    data: {
+      steps: workflow.steps,
+      index: 0,
+      vars: {
+        input: data.body || {},
+      },
+      executionId,
+    },
   });
 
-  const result = await runEngine(workflow.steps, input, data.headers);
+  logger.info("Public workflow started", { workflowId, executionId });
 
   return {
     status: 200,
-    body: result,
+    body: { ok: true, executionId },
   };
 };

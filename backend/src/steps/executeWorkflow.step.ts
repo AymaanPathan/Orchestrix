@@ -8,40 +8,35 @@ export const config: ApiRouteConfig = {
   path: "/workflow/execute",
   method: "POST",
   flows: ["WorkflowBuilder"],
-  emits: [],
+  emits: ["workflow.start"],
 };
 
 export const handler: StepHandler<typeof config> = async (req, ctx) => {
+  console.log("🔥 EXECUTE API HIT", Date.now());
   await connectMongo();
-  const { steps, input } = req.body;
 
+  const { steps, input } = req.body;
   if (!Array.isArray(steps)) {
     return { status: 400, body: { error: "steps[] required" } };
   }
 
   const executionId = uuidv4();
 
-  // shared execution memory
-  const vars: Record<string, any> = {
-    input: input || {},
-    executionId,
-  };
-
   await ctx.emit({
     topic: "workflow.start",
     data: {
       steps,
       index: 0,
-      vars,
+      vars: {
+        input: input || {},
+        executionId,
+      },
       executionId,
     },
   });
 
   return {
     status: 200,
-    body: {
-      ok: true,
-      executionId,
-    },
+    body: { ok: true, executionId },
   };
 };

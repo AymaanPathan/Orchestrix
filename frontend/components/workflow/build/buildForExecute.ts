@@ -3,7 +3,9 @@ export function buildForExecute(nodes: any[], edges: any[]) {
 
   const sorted = topologicalSort(nodes, edges);
 
+  // --------------------------------------------------
   // INPUT VARIABLES (from Input node)
+  // --------------------------------------------------
   const inputVars: string[] = [];
   const input: Record<string, any> = {};
 
@@ -11,64 +13,92 @@ export function buildForExecute(nodes: any[], edges: any[]) {
     if (n.type === "input") {
       const vars = n.data?.fields?.variables || [];
       vars.forEach((v: any) => {
+        if (!v?.name) return;
         inputVars.push(v.name);
         input[v.name] = v.default ?? "";
       });
     }
   });
 
+  // --------------------------------------------------
+  // BUILD STEPS
+  // --------------------------------------------------
   const steps: any[] = [];
   let counter = 1;
 
-  // BUILD ACTUAL STEPS
   for (const node of sorted) {
-    if (node.type === "input") continue;
-
     const raw = node.data?.fields || {};
     const transformed = transformTemplates(raw, inputVars);
 
-    const step: any = {
-      id: `step${counter++}`,
-      type: node.type,
-      pass: node.data?.pass,
-      ...transformed,
-    };
+    const stepId = `step${counter++}`;
 
-    // INPUT VALIDATION NODE SUPPORT
-    if (node.type === "inputValidation") {
-      step.rules = raw.rules || [];
-
-      step.rules = step.rules.map((r: any) => ({
-        ...r,
-        field:
-          typeof r.field === "string"
-            ? transformTemplates(r.field, inputVars)
-            : r.field,
-      }));
-    }
-    if (node.type === "emailSend") {
-      const f = node.data?.fields || {};
+    // --------------------------------------------------
+    // INPUT NODE (MUST EXECUTE)
+    // --------------------------------------------------
+    if (node.type === "input") {
       steps.push({
-        id: `step${counter++}`,
-        type: "emailSend",
-        to: transformTemplates(f.to, inputVars),
-        subject: transformTemplates(f.subject, inputVars),
-        body: transformTemplates(f.body, inputVars),
-        output: f.outputVar || "emailResult",
+        id: stepId,
+        type: "input",
+        variables: raw.variables || [],
         pass: node.data?.pass,
       });
       continue;
     }
 
-    steps.push(step);
+    // --------------------------------------------------
+    // INPUT VALIDATION
+    // --------------------------------------------------
+    if (node.type === "inputValidation") {
+      steps.push({
+        id: stepId,
+        type: "inputValidation",
+        rules: (raw.rules || []).map((r: any) => ({
+          ...r,
+          field:
+            typeof r.field === "string"
+              ? transformTemplates(r.field, inputVars)
+              : r.field,
+        })),
+        output: raw.outputVar || "validated",
+        pass: node.data?.pass,
+      });
+      continue;
+    }
+
+    // --------------------------------------------------
+    // EMAIL SEND
+    // --------------------------------------------------
+    if (node.type === "emailSend") {
+      steps.push({
+        id: stepId,
+        type: "emailSend",
+        to: transformTemplates(raw.to, inputVars),
+        subject: transformTemplates(raw.subject, inputVars),
+        body: transformTemplates(raw.body, inputVars),
+        output: raw.outputVar || "emailResult",
+        pass: node.data?.pass,
+      });
+      continue;
+    }
+
+    // --------------------------------------------------
+    // GENERIC STEPS (dbFind, dbInsert, dbUpdate, etc.)
+    // --------------------------------------------------
+    steps.push({
+      id: stepId,
+      type: node.type,
+      pass: node.data?.pass,
+      ...transformed,
+    });
   }
+  console.log("STEPS SENT TO ENGINE:", steps);
 
   return { steps, input };
 }
 
-// ============================================
-// HELPERS (all in one file)
-// ============================================
+/* =========================================================
+   HELPERS
+========================================================= */
 
 function validateNoCycles(nodes: any[], edges: any[]) {
   const adj = new Map<string, string[]>();
@@ -140,7 +170,6 @@ function topologicalSort(nodes: any[], edges: any[]) {
 }
 
 function transformTemplates(obj: any, inputVars: string[]): any {
-  // Recursively transform {{ variable }} → input.variable or variable
   if (Array.isArray(obj)) {
     return obj.map((item) => transformTemplates(item, inputVars));
   }
@@ -154,18 +183,15 @@ function transformTemplates(obj: any, inputVars: string[]): any {
   }
 
   if (typeof obj === "string") {
-    // Check if it's a template: {{ something }}
     const match = obj.match(/^{{\s*(.*?)\s*}}$/);
     if (match) {
-      const varPath = match[1].trim(); // e.g., "name" or "foundAgain._id"
-      const rootVar = varPath.split(".")[0]; // e.g., "name" or "foundAgain"
+      const varPath = match[1].trim();
+      const rootVar = varPath.split(".")[0];
 
-      // If root is an input variable, add "input." prefix
       if (inputVars.includes(rootVar)) {
         return `input.${varPath}`;
       }
 
-      // Otherwise, return as-is (it's an output var from previous step)
       return varPath;
     }
   }

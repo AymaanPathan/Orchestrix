@@ -1,6 +1,5 @@
 import { EventConfig, StepHandler } from "motia";
 import mongoose from "mongoose";
-
 import { connectMongo } from "../lib/mongo";
 
 export const config: EventConfig = {
@@ -11,31 +10,46 @@ export const config: EventConfig = {
 };
 
 export const handler: StepHandler<typeof config> = async (payload, ctx) => {
-  const { executionId, output, finishedAt } = payload as any;
+  const {
+    executionId,
+    message,
+    level = "info",
+    stepId,
+    stepIndex,
+    finished = false,
+  } = payload as any;
 
   await connectMongo();
-
-  if (mongoose.connection.readyState !== 1) {
-    await new Promise((resolve) => {
-      mongoose.connection.once("connected", resolve);
-    });
-  }
 
   const coll = mongoose.connection.collection("workflow_logs");
 
   await coll.updateOne(
     { executionId },
     {
-      $set: {
-        finalOutput: output,
-        finishedAt: new Date(finishedAt),
-        status: "completed",
+      $push: {
+        logs: {
+          at: new Date(),
+          level,
+          message,
+          stepId,
+          stepIndex,
+        },
+      },
+      ...(finished
+        ? {
+            $set: {
+              finished: true,
+              finishedAt: new Date(),
+            },
+          }
+        : {}),
+      $setOnInsert: {
+        startedAt: new Date(),
+        finished: false,
       },
     },
     { upsert: true }
   );
 
-  ctx.logger.info("💾 Workflow final output persisted", {
-    executionId,
-  });
+  ctx.logger.info("📝 Log persisted", { executionId, message });
 };

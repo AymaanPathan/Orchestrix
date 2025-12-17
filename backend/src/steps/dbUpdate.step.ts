@@ -1,3 +1,7 @@
+import "../models/user.model.js";
+import "../models/workflow.model.js";
+import "../models/publishedApi.model.js";
+
 import { EventConfig, StepHandler } from "motia";
 import { connectMongo } from "../lib/mongo";
 import userModel from "../models/user.model";

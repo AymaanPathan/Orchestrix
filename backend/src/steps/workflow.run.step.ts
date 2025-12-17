@@ -4,22 +4,44 @@ export const config: EventConfig = {
   name: "workflow.run",
   type: "event",
   subscribes: ["workflow.run"],
-  emits: ["workflow.run", "workflow.finished"],
+  emits: [
+    "workflow.run",
+    "workflow.trace",
+    "input", 
+    "dbFind",
+    "dbInsert",
+    "inputValidation",
+    "emailSend",
+    "workflow.delay",
+  ],
 };
 
-export const handler: StepHandler<typeof config> = async (payload, ctx) => {
-  const { steps, index, vars, executionId } = payload as any;
-
+export const handler: StepHandler<typeof config> = async (
+  payload: any,
+  ctx
+) => {
+  const { steps, index, vars, executionId } = payload;
   const step = steps[index];
 
+  console.log("▶ workflow.run index:", index);
+
+  // ✅ DONE — stop execution
   if (!step) {
     await ctx.emit({
-      topic: "workflow.finished",
-      data: { executionId, vars },
+      topic: "workflow.trace",
+      data: {
+        executionId,
+        stepId: "__end__",
+        stepType: "workflow.finished",
+        index,
+        output: vars,
+        varsSnapshot: vars,
+      },
     });
     return;
   }
 
+  // ✅ Dispatch step
   await ctx.emit({
     topic: step.type,
     data: {
