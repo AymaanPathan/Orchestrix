@@ -5,27 +5,22 @@ export const config: EventConfig = {
   type: "event",
   subscribes: ["workflow.run"],
   emits: [
-    "workflow.run",
     "workflow.trace",
-    "input", 
     "dbFind",
     "dbInsert",
-    "inputValidation",
+    "input",
     "emailSend",
     "workflow.delay",
   ],
 };
 
-export const handler: StepHandler<typeof config> = async (
-  payload: any,
-  ctx
-) => {
+
+export const handler: StepHandler<typeof config> = async (payload, ctx) => {
   const { steps, index, vars, executionId } = payload;
   const step = steps[index];
 
   console.log("▶ workflow.run index:", index);
 
-  // ✅ DONE — stop execution
   if (!step) {
     await ctx.emit({
       topic: "workflow.trace",
@@ -41,7 +36,6 @@ export const handler: StepHandler<typeof config> = async (
     return;
   }
 
-  // ✅ Dispatch step
   await ctx.emit({
     topic: step.type,
     data: {
@@ -53,3 +47,4 @@ export const handler: StepHandler<typeof config> = async (
     },
   });
 };
+

@@ -10,7 +10,7 @@ export async function connectMongo() {
     return;
   }
 
-  await mongoose.connect(process.env.MONGO_URI!);
+  await mongoose.connect(process.env.MONGODB_URI!);
   isConnected = true;
 
   console.log("✅ MongoDB Connected");

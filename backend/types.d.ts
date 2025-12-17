@@ -17,7 +17,7 @@ declare module 'motia' {
     'getWorkflowTrace': ApiRouteHandler<Record<string, unknown>, unknown, never>
     'workflow.trace': EventHandler<never, never>
     'workflow.start': EventHandler<never, { topic: 'workflow.run'; data: never }>
-    'workflow.run': EventHandler<never, { topic: 'workflow.run'; data: never } | { topic: 'workflow.trace'; data: never } | { topic: 'input'; data: never } | { topic: 'dbFind'; data: never } | { topic: 'dbInsert'; data: never }>
+    'workflow.run': EventHandler<never, { topic: 'workflow.trace'; data: never } | { topic: 'dbFind'; data: never } | { topic: 'dbInsert'; data: never } | { topic: 'input'; data: never }>
     'workflowLogs': ApiRouteHandler<Record<string, unknown>, unknown, never>
     'saveWorkflow': ApiRouteHandler<Record<string, unknown>, unknown, never>
     'runWorkflowPublic': ApiRouteHandler<Record<string, unknown>, unknown, never>
