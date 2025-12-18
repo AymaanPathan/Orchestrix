@@ -12,6 +12,7 @@ import {
   Zap,
   FileJson,
   Terminal,
+  Sparkles,
 } from "lucide-react";
 
 interface SaveWorkflowModalProps {
@@ -52,7 +53,6 @@ export default function SaveWorkflowModal({
   const slug = apiName ? generateSlug(apiName) : "";
   const apiPath = slug ? `/workflow/run/{workflowId}/${slug}` : "";
 
-  // Generate example body based on input variables
   const generateExampleBody = () => {
     if (!savedData?.inputVariables?.length) {
       return {
@@ -146,59 +146,62 @@ console.log(result);`
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
+            transition={{ duration: 0.25 }}
+            className="fixed inset-0 bg-black/70 backdrop-blur-md z-50"
             onClick={handleClose}
           />
 
           {/* Modal */}
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              initial={{ opacity: 0, scale: 0.96, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+              exit={{ opacity: 0, scale: 0.96, y: 10 }}
+              transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
               className={`w-full ${
-                savedData ? "max-w-3xl" : "max-w-md"
-              } bg-[#1a1a1a] rounded-2xl shadow-2xl border border-white/[0.08] pointer-events-auto overflow-hidden`}
+                savedData ? "max-w-2xl" : "max-w-md"
+              } bg-[#0f0f0f]/95 backdrop-blur-xl rounded-3xl shadow-[0_8px_32px_rgba(0,0,0,0.4),inset_0_1px_1px_rgba(255,255,255,0.06)] border border-white/[0.06] pointer-events-auto overflow-hidden`}
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header */}
-              <div className="relative px-6 pt-6 pb-4 border-b border-white/[0.06]">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-white/[0.08] flex items-center justify-center">
-                    <Workflow size={20} className="text-white/80" />
+              <div className="relative px-7 pt-7 pb-5">
+                <div className="flex items-start gap-4">
+                  <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-white/[0.09] to-white/[0.04] shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)] flex items-center justify-center border border-white/[0.06]">
+                    {savedData ? (
+                      <CheckCircle2 size={20} className="text-emerald-400" />
+                    ) : (
+                      <Workflow size={20} className="text-white/70" />
+                    )}
                   </div>
-                  <div className="flex-1">
-                    <h2 className="text-lg font-semibold text-white/95">
-                      {savedData
-                        ? "API Published Successfully!"
-                        : "Save Workflow"}
+                  <div className="flex-1 pt-0.5">
+                    <h2 className="text-xl font-semibold text-white/95 tracking-tight">
+                      {savedData ? "API Published" : "Save Workflow as API"}
                     </h2>
-                    <p className="text-[13px] text-white/50 mt-0.5">
+                    <p className="text-sm text-white/45 mt-1.5 leading-relaxed">
                       {savedData
-                        ? "Your workflow is now a callable API"
-                        : "Give your API endpoint a name"}
+                        ? "Your workflow is ready to use"
+                        : "Create a callable endpoint for your workflow"}
                     </p>
                   </div>
                   {!isSaving && (
                     <button
                       onClick={handleClose}
-                      className="p-1.5 hover:bg-white/[0.06] rounded-lg transition-colors"
+                      className="p-2 hover:bg-white/[0.06] rounded-xl transition-all duration-200"
                     >
-                      <X size={18} className="text-white/60" />
+                      <X size={18} className="text-white/50" />
                     </button>
                   )}
                 </div>
               </div>
 
               {/* Content */}
-              <div className="p-6">
+              {/* Content */}
+              <div className="px-7 pb-7 overflow-y-auto">
                 {!savedData ? (
-                  <div className="space-y-5">
+                  <div className="space-y-6">
                     {/* API Name Input */}
-                    <div>
-                      <label className="block text-[13px] font-medium text-white/80 mb-2">
+                    <div className="space-y-2.5">
+                      <label className="block text-sm font-medium text-white/70">
                         API Name
                       </label>
                       <input
@@ -209,13 +212,14 @@ console.log(result);`
                           setError("");
                         }}
                         onKeyDown={handleKeyDown}
-                        placeholder="e.g., User Registration API"
+                        placeholder="User Registration API"
                         disabled={isSaving}
-                        className="w-full px-4 py-2.5 bg-white/[0.04] border border-white/[0.08] rounded-xl 
-                          text-[14px] text-white placeholder-white/40 
-                          focus:outline-none focus:border-white/[0.2] focus:bg-white/[0.06]
+                        className="w-full px-4 py-3 bg-white/[0.03] border border-white/[0.08] rounded-2xl 
+                          text-[15px] text-white placeholder-white/30 
+                          focus:outline-none focus:border-white/[0.15] focus:bg-white/[0.04]
+                          shadow-[inset_0_1px_2px_rgba(0,0,0,0.3)]
                           disabled:opacity-50 disabled:cursor-not-allowed
-                          transition-all"
+                          transition-all duration-200"
                         autoFocus
                       />
 
@@ -223,46 +227,48 @@ console.log(result);`
                         <motion.div
                           initial={{ opacity: 0, y: -4 }}
                           animate={{ opacity: 1, y: 0 }}
-                          className="flex items-center gap-2 mt-2 text-red-400 text-[12px]"
+                          className="flex items-center gap-2 px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-xl"
                         >
-                          <AlertCircle size={14} />
-                          {error}
+                          <AlertCircle size={14} className="text-red-400" />
+                          <span className="text-sm text-red-400">{error}</span>
                         </motion.div>
                       )}
                     </div>
 
-                    {/* Generated Slug Preview */}
+                    {/* Preview Section */}
                     {slug && (
                       <motion.div
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: "auto" }}
-                        className="space-y-2"
+                        className="space-y-4 pt-2"
                       >
-                        <label className="block text-[13px] font-medium text-white/80">
-                          Generated Slug
-                        </label>
-                        <div className="px-4 py-2.5 bg-white/[0.04] border border-white/[0.06] rounded-xl">
-                          <code className="text-[13px] text-emerald-400 font-mono">
-                            {slug}
-                          </code>
+                        {/* Generated Slug */}
+                        <div className="space-y-2.5">
+                          <label className="block text-sm font-medium text-white/70">
+                            URL Slug
+                          </label>
+                          <div className="px-4 py-3 bg-white/[0.02] border border-white/[0.06] rounded-xl">
+                            <code className="text-sm text-emerald-400 font-mono">
+                              {slug}
+                            </code>
+                          </div>
                         </div>
-                      </motion.div>
-                    )}
 
-                    {/* API Path Preview */}
-                    {apiPath && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        className="space-y-2"
-                      >
-                        <label className="block text-[13px] font-medium text-white/80">
-                          API Endpoint
-                        </label>
-                        <div className="px-4 py-2.5 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-xl">
-                          <code className="text-[13px] text-blue-300 font-mono break-all">
-                            POST {apiPath}
-                          </code>
+                        {/* API Endpoint Preview */}
+                        <div className="space-y-2.5">
+                          <label className="block text-sm font-medium text-white/70">
+                            Endpoint Preview
+                          </label>
+                          <div className="px-4 py-3 bg-gradient-to-br from-blue-500/[0.08] to-purple-500/[0.08] border border-blue-400/[0.15] rounded-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]">
+                            <div className="flex items-center gap-2">
+                              <span className="px-2 py-0.5 bg-blue-400/20 rounded-md text-xs font-semibold text-blue-300">
+                                POST
+                              </span>
+                              <code className="text-sm text-blue-200 font-mono">
+                                {apiPath}
+                              </code>
+                            </div>
+                          </div>
                         </div>
                       </motion.div>
                     )}
@@ -272,20 +278,22 @@ console.log(result);`
                       <button
                         onClick={handleClose}
                         disabled={isSaving}
-                        className="flex-1 px-4 py-2.5 text-[14px] font-medium text-white/70 
-                          bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08]
-                          rounded-xl transition-all active:scale-[0.98]
-                          disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex-1 px-4 py-3 text-sm font-medium text-white/60 
+                          bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.08]
+                          rounded-2xl transition-all duration-200
+                          disabled:opacity-50 disabled:cursor-not-allowed
+                          shadow-[inset_0_1px_1px_rgba(255,255,255,0.03)]"
                       >
                         Cancel
                       </button>
                       <button
                         onClick={handleSubmit}
                         disabled={!apiName.trim() || isSaving}
-                        className="flex-1 px-4 py-2.5 text-[14px] font-medium text-black 
-                          bg-white hover:bg-white/90 rounded-xl 
+                        className="flex-1 px-4 py-3 text-sm font-semibold text-black 
+                          bg-white hover:bg-white/95 rounded-2xl 
                           flex items-center justify-center gap-2
-                          transition-all active:scale-[0.98]
+                          shadow-[0_1px_3px_rgba(0,0,0,0.3)]
+                          transition-all duration-200
                           disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {isSaving ? (
@@ -295,8 +303,8 @@ console.log(result);`
                           </>
                         ) : (
                           <>
+                            <Sparkles size={16} />
                             Publish API
-                            <ArrowRight size={16} />
                           </>
                         )}
                       </button>
@@ -306,86 +314,74 @@ console.log(result);`
                   <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="space-y-4"
+                    className="space-y-5"
                   >
-                    {/* Success Banner */}
-                    <div className="flex items-center gap-3 px-4 py-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+                    {/* Success Message */}
+                    <div className="flex items-start gap-3 px-4 py-3.5 bg-emerald-500/[0.08] border border-emerald-400/[0.15] rounded-2xl shadow-[inset_0_1px_1px_rgba(16,185,129,0.1)]">
                       <CheckCircle2
-                        size={20}
-                        className="text-emerald-400 flex-shrink-0"
+                        size={18}
+                        className="text-emerald-400 mt-0.5 flex-shrink-0"
                       />
                       <div className="flex-1">
-                        <p className="text-[14px] font-medium text-emerald-300">
-                          Your workflow is now live!
+                        <p className="text-sm font-medium text-emerald-300">
+                          Successfully published
                         </p>
-                        <p className="text-[12px] text-emerald-400/70 mt-0.5">
-                          Start making API calls to execute your workflow
+                        <p className="text-xs text-emerald-400/60 mt-1">
+                          Your workflow is now accessible via API endpoint
                         </p>
                       </div>
                     </div>
 
                     {/* Tabs */}
-                    <div className="flex gap-2 p-1 bg-white/[0.03] rounded-lg border border-white/[0.06]">
-                      <button
-                        onClick={() => setActiveTab("overview")}
-                        className={`flex-1 px-3 py-2 rounded-md text-[13px] font-medium transition-all ${
-                          activeTab === "overview"
-                            ? "bg-white/[0.08] text-white"
-                            : "text-white/60 hover:text-white/80"
-                        }`}
-                      >
-                        <div className="flex items-center justify-center gap-2">
-                          <BookOpen size={14} />
-                          Overview
-                        </div>
-                      </button>
-                      <button
-                        onClick={() => setActiveTab("curl")}
-                        className={`flex-1 px-3 py-2 rounded-md text-[13px] font-medium transition-all ${
-                          activeTab === "curl"
-                            ? "bg-white/[0.08] text-white"
-                            : "text-white/60 hover:text-white/80"
-                        }`}
-                      >
-                        <div className="flex items-center justify-center gap-2">
-                          <Terminal size={14} />
-                          cURL
-                        </div>
-                      </button>
-                      <button
-                        onClick={() => setActiveTab("javascript")}
-                        className={`flex-1 px-3 py-2 rounded-md text-[13px] font-medium transition-all ${
-                          activeTab === "javascript"
-                            ? "bg-white/[0.08] text-white"
-                            : "text-white/60 hover:text-white/80"
-                        }`}
-                      >
-                        <div className="flex items-center justify-center gap-2">
-                          <Code size={14} />
-                          JavaScript
-                        </div>
-                      </button>
+                    <div className="flex gap-1 p-1 bg-white/[0.02] rounded-xl border border-white/[0.06]">
+                      {[
+                        { id: "overview", icon: BookOpen, label: "Details" },
+                        { id: "curl", icon: Terminal, label: "cURL" },
+                        { id: "javascript", icon: Code, label: "JavaScript" },
+                      ].map((tab) => (
+                        <button
+                          key={tab.id}
+                          onClick={() =>
+                            setActiveTab(
+                              tab.id as "overview" | "curl" | "javascript"
+                            )
+                          }
+                          className={`flex-1 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                            activeTab === tab.id
+                              ? "bg-white/[0.08] text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)]"
+                              : "text-white/50 hover:text-white/70 hover:bg-white/[0.03]"
+                          }`}
+                        >
+                          <div className="flex items-center justify-center gap-2">
+                            <tab.icon size={15} />
+                            <span>{tab.label}</span>
+                          </div>
+                        </button>
+                      ))}
                     </div>
 
                     {/* Tab Content */}
-                    <div className="space-y-4">
+                    <AnimatePresence mode="wait">
                       {activeTab === "overview" && (
                         <motion.div
                           key="overview"
-                          initial={{ opacity: 0, y: 10 }}
+                          initial={{ opacity: 0, y: 8 }}
                           animate={{ opacity: 1, y: 0 }}
-                          className="space-y-4"
+                          exit={{ opacity: 0, y: -8 }}
+                          transition={{ duration: 0.2 }}
+                          className="space-y-5"
                         >
-                          {/* API Details */}
+                          {/* Key Info Grid */}
                           <div className="grid grid-cols-2 gap-3">
+                            {/* Workflow ID */}
                             <div className="space-y-2">
-                              <label className="flex items-center gap-2 text-[12px] font-medium text-white/60">
+                              <label className="flex items-center gap-1.5 text-xs font-medium text-white/50">
                                 <Workflow size={12} />
                                 Workflow ID
                               </label>
                               <div className="flex items-center gap-2">
-                                <div className="flex-1 px-3 py-2 bg-white/[0.04] border border-white/[0.06] rounded-lg">
-                                  <code className="text-[12px] text-white/90 font-mono break-all">
+                                <div className="flex-1 px-3 py-2.5 bg-white/[0.02] border border-white/[0.06] rounded-xl overflow-hidden">
+                                  <code className="text-xs text-white/80 font-mono block truncate">
                                     {savedData.workflowId}
                                   </code>
                                 </div>
@@ -396,7 +392,7 @@ console.log(result);`
                                       "workflowId"
                                     )
                                   }
-                                  className="px-2 py-2 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] rounded-lg transition-all active:scale-95"
+                                  className="p-2 bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] rounded-lg transition-all duration-200"
                                   title="Copy"
                                 >
                                   {copiedField === "workflowId" ? (
@@ -405,19 +401,20 @@ console.log(result);`
                                       className="text-emerald-400"
                                     />
                                   ) : (
-                                    <Copy size={14} className="text-white/60" />
+                                    <Copy size={14} className="text-white/50" />
                                   )}
                                 </button>
                               </div>
                             </div>
 
+                            {/* API Name */}
                             <div className="space-y-2">
-                              <label className="flex items-center gap-2 text-[12px] font-medium text-white/60">
+                              <label className="flex items-center gap-1.5 text-xs font-medium text-white/50">
                                 <Zap size={12} />
                                 API Name
                               </label>
-                              <div className="px-3 py-2 bg-white/[0.04] border border-white/[0.06] rounded-lg">
-                                <div className="text-[13px] text-white/90 font-medium">
+                              <div className="px-3 py-2.5 bg-white/[0.02] border border-white/[0.06] rounded-xl">
+                                <div className="text-sm text-white/90 font-medium truncate">
                                   {savedData.apiName}
                                 </div>
                               </div>
@@ -426,15 +423,20 @@ console.log(result);`
 
                           {/* Endpoint */}
                           <div className="space-y-2">
-                            <label className="flex items-center gap-2 text-[12px] font-medium text-white/60">
+                            <label className="flex items-center gap-1.5 text-xs font-medium text-white/50">
                               <Terminal size={12} />
                               API Endpoint
                             </label>
                             <div className="flex items-center gap-2">
-                              <div className="flex-1 px-3 py-2.5 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-lg">
-                                <code className="text-[13px] text-blue-300 font-mono break-all">
-                                  POST {savedData.apiPath}
-                                </code>
+                              <div className="flex-1 px-3 py-2.5 bg-gradient-to-br from-blue-500/[0.08] to-purple-500/[0.08] border border-blue-400/[0.15] rounded-xl overflow-hidden">
+                                <div className="flex items-center gap-2">
+                                  <span className="px-1.5 py-0.5 bg-blue-400/20 rounded text-xs font-semibold text-blue-300 flex-shrink-0">
+                                    POST
+                                  </span>
+                                  <code className="text-xs text-blue-200 font-mono truncate">
+                                    {savedData.apiPath}
+                                  </code>
+                                </div>
                               </div>
                               <button
                                 onClick={() =>
@@ -443,7 +445,7 @@ console.log(result);`
                                     "apiPath"
                                   )
                                 }
-                                className="px-2 py-2.5 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] rounded-lg transition-all active:scale-95"
+                                className="p-2 bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] rounded-lg transition-all duration-200"
                                 title="Copy"
                               >
                                 {copiedField === "apiPath" ? (
@@ -452,21 +454,21 @@ console.log(result);`
                                     className="text-emerald-400"
                                   />
                                 ) : (
-                                  <Copy size={14} className="text-white/60" />
+                                  <Copy size={14} className="text-white/50" />
                                 )}
                               </button>
                             </div>
                           </div>
 
-                          {/* Request Body Structure */}
+                          {/* Request Body */}
                           <div className="space-y-2">
-                            <label className="flex items-center gap-2 text-[12px] font-medium text-white/60">
+                            <label className="flex items-center gap-1.5 text-xs font-medium text-white/50">
                               <FileJson size={12} />
-                              Request Body Structure
+                              Request Body
                             </label>
                             <div className="relative">
-                              <pre className="px-4 py-3 bg-[#0a0a0a] border border-white/[0.06] rounded-lg overflow-x-auto">
-                                <code className="text-[12px] text-white/80 font-mono">
+                              <pre className="px-3 py-3 bg-[#0a0a0a]/80 border border-white/[0.06] rounded-xl overflow-x-auto max-h-48 shadow-[inset_0_1px_2px_rgba(0,0,0,0.3)]">
+                                <code className="text-xs text-white/70 font-mono">
                                   {JSON.stringify(exampleBody, null, 2)}
                                 </code>
                               </pre>
@@ -477,7 +479,7 @@ console.log(result);`
                                     "body"
                                   )
                                 }
-                                className="absolute top-2 right-2 px-2 py-1.5 bg-white/[0.08] hover:bg-white/[0.12] border border-white/[0.08] rounded-md transition-all active:scale-95"
+                                className="absolute top-2 right-2 p-1.5 bg-white/[0.08] hover:bg-white/[0.12] border border-white/[0.08] rounded-lg transition-all duration-200"
                                 title="Copy"
                               >
                                 {copiedField === "body" ? (
@@ -486,7 +488,7 @@ console.log(result);`
                                     className="text-emerald-400"
                                   />
                                 ) : (
-                                  <Copy size={12} className="text-white/60" />
+                                  <Copy size={12} className="text-white/50" />
                                 )}
                               </button>
                             </div>
@@ -496,28 +498,29 @@ console.log(result);`
                           {savedData.inputVariables &&
                             savedData.inputVariables.length > 0 && (
                               <div className="space-y-2">
-                                <label className="text-[12px] font-medium text-white/60">
-                                  Input Variables
+                                <label className="text-xs font-medium text-white/50">
+                                  Input Parameters (
+                                  {savedData.inputVariables.length})
                                 </label>
-                                <div className="space-y-2">
+                                <div className="space-y-2 max-h-32 overflow-y-auto pr-1">
                                   {savedData.inputVariables.map((v, i) => (
                                     <div
                                       key={i}
-                                      className="flex items-center gap-3 px-3 py-2 bg-white/[0.03] border border-white/[0.06] rounded-lg"
+                                      className="flex items-center gap-3 px-3 py-2 bg-white/[0.02] border border-white/[0.06] rounded-lg"
                                     >
-                                      <div className="flex-1">
-                                        <div className="text-[13px] text-white/90 font-mono">
+                                      <div className="flex-1 min-w-0">
+                                        <div className="text-xs text-white/85 font-mono truncate">
                                           {v.name}
                                         </div>
                                         {v.type && (
-                                          <div className="text-[11px] text-white/50 mt-0.5">
+                                          <div className="text-[10px] text-white/40 mt-0.5">
                                             {v.type}
                                           </div>
                                         )}
                                       </div>
                                       {v.default !== undefined && (
-                                        <div className="px-2 py-1 bg-white/[0.06] rounded text-[11px] text-white/60 font-mono">
-                                          default: {JSON.stringify(v.default)}
+                                        <div className="px-2 py-0.5 bg-white/[0.06] rounded text-[10px] text-white/50 font-mono flex-shrink-0">
+                                          {JSON.stringify(v.default)}
                                         </div>
                                       )}
                                     </div>
@@ -531,16 +534,18 @@ console.log(result);`
                       {activeTab === "curl" && (
                         <motion.div
                           key="curl"
-                          initial={{ opacity: 0, y: 10 }}
+                          initial={{ opacity: 0, y: 8 }}
                           animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -8 }}
+                          transition={{ duration: 0.2 }}
                           className="space-y-2"
                         >
-                          <label className="text-[12px] font-medium text-white/60">
-                            cURL Example
+                          <label className="text-xs font-medium text-white/50">
+                            Copy this command to test your API
                           </label>
                           <div className="relative">
-                            <pre className="px-4 py-3 bg-[#0a0a0a] border border-white/[0.06] rounded-lg overflow-x-auto">
-                              <code className="text-[12px] text-emerald-300 font-mono whitespace-pre">
+                            <pre className="px-3 py-3 bg-[#0a0a0a]/80 border border-white/[0.06] rounded-xl overflow-x-auto max-h-64 shadow-[inset_0_1px_2px_rgba(0,0,0,0.3)]">
+                              <code className="text-xs text-emerald-300 font-mono whitespace-pre">
                                 {curlExample}
                               </code>
                             </pre>
@@ -548,7 +553,7 @@ console.log(result);`
                               onClick={() =>
                                 copyToClipboard(curlExample, "curl")
                               }
-                              className="absolute top-2 right-2 px-2 py-1.5 bg-white/[0.08] hover:bg-white/[0.12] border border-white/[0.08] rounded-md transition-all active:scale-95"
+                              className="absolute top-2 right-2 p-1.5 bg-white/[0.08] hover:bg-white/[0.12] border border-white/[0.08] rounded-lg transition-all duration-200"
                               title="Copy"
                             >
                               {copiedField === "curl" ? (
@@ -557,7 +562,7 @@ console.log(result);`
                                   className="text-emerald-400"
                                 />
                               ) : (
-                                <Copy size={12} className="text-white/60" />
+                                <Copy size={12} className="text-white/50" />
                               )}
                             </button>
                           </div>
@@ -567,22 +572,24 @@ console.log(result);`
                       {activeTab === "javascript" && (
                         <motion.div
                           key="javascript"
-                          initial={{ opacity: 0, y: 10 }}
+                          initial={{ opacity: 0, y: 8 }}
                           animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -8 }}
+                          transition={{ duration: 0.2 }}
                           className="space-y-2"
                         >
-                          <label className="text-[12px] font-medium text-white/60">
-                            JavaScript Example
+                          <label className="text-xs font-medium text-white/50">
+                            Use this in your JavaScript application
                           </label>
                           <div className="relative">
-                            <pre className="px-4 py-3 bg-[#0a0a0a] border border-white/[0.06] rounded-lg overflow-x-auto">
-                              <code className="text-[12px] text-blue-300 font-mono whitespace-pre">
+                            <pre className="px-3 py-3 bg-[#0a0a0a]/80 border border-white/[0.06] rounded-xl overflow-x-auto max-h-64 shadow-[inset_0_1px_2px_rgba(0,0,0,0.3)]">
+                              <code className="text-xs text-blue-300 font-mono whitespace-pre">
                                 {jsExample}
                               </code>
                             </pre>
                             <button
                               onClick={() => copyToClipboard(jsExample, "js")}
-                              className="absolute top-2 right-2 px-2 py-1.5 bg-white/[0.08] hover:bg-white/[0.12] border border-white/[0.08] rounded-md transition-all active:scale-95"
+                              className="absolute top-2 right-2 p-1.5 bg-white/[0.08] hover:bg-white/[0.12] border border-white/[0.08] rounded-lg transition-all duration-200"
                               title="Copy"
                             >
                               {copiedField === "js" ? (
@@ -591,45 +598,46 @@ console.log(result);`
                                   className="text-emerald-400"
                                 />
                               ) : (
-                                <Copy size={12} className="text-white/60" />
+                                <Copy size={12} className="text-white/50" />
                               )}
                             </button>
                           </div>
                         </motion.div>
                       )}
-                    </div>
+                    </AnimatePresence>
 
                     {/* Quick Tips */}
-                    <div className="px-4 py-3 bg-blue-500/10 border border-blue-500/20 rounded-xl">
-                      <div className="flex gap-2">
-                        <Zap
-                          size={14}
-                          className="text-blue-400 mt-0.5 flex-shrink-0"
-                        />
-                        <div className="space-y-1">
-                          <p className="text-[12px] font-medium text-blue-300">
-                            Quick Tips
-                          </p>
-                          <ul className="text-[11px] text-blue-300/80 space-y-1 list-disc list-inside">
-                            <li>
-                              Include all required input variables in the
-                              request body
-                            </li>
-                            <li>
-                              The API returns the workflow execution result
-                            </li>
-                            <li>Check execution logs for debugging</li>
-                          </ul>
-                        </div>
+                    <div className="flex gap-3 px-3.5 py-3 bg-blue-500/[0.06] border border-blue-400/[0.12] rounded-xl">
+                      <Zap
+                        size={14}
+                        className="text-blue-400 mt-0.5 flex-shrink-0"
+                      />
+                      <div className="space-y-1.5">
+                        <p className="text-xs font-medium text-blue-300">
+                          Quick Tips
+                        </p>
+                        <ul className="text-[11px] text-blue-300/70 space-y-1">
+                          <li>
+                            • Include all required parameters in the request
+                            body
+                          </li>
+                          <li>
+                            • Response contains the workflow execution result
+                          </li>
+                          <li>
+                            • Check logs for detailed debugging information
+                          </li>
+                        </ul>
                       </div>
                     </div>
 
-                    {/* Close Button */}
+                    {/* Done Button */}
                     <button
                       onClick={handleClose}
-                      className="w-full px-4 py-2.5 text-[14px] font-medium text-black 
-                        bg-white hover:bg-white/90 rounded-xl 
-                        transition-all active:scale-[0.98]"
+                      className="w-full px-4 py-3 text-sm font-semibold text-black 
+                        bg-white hover:bg-white/95 rounded-2xl 
+                        shadow-[0_1px_3px_rgba(0,0,0,0.3)]
+                        transition-all duration-200"
                     >
                       Done
                     </button>
