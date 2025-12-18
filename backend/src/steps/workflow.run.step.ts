@@ -1,4 +1,4 @@
-// this file is responsible for running each step in the workflow on execute
+// src/steps/workflow.run.step.ts
 import { EventConfig, StepHandler } from "motia";
 
 export const config: EventConfig = {
@@ -6,14 +6,13 @@ export const config: EventConfig = {
   type: "event",
   subscribes: ["workflow.run"],
   emits: [
-    "input", // ✅ ADD THIS
+    "input",
     "dbFind",
     "dbInsert",
     "dbUpdate",
     "delay",
     "authMiddleware",
     "emailSend",
-    "workflow.log",
   ],
 };
 
@@ -22,8 +21,17 @@ export const handler: StepHandler<typeof config> = async (
   ctx
 ) => {
   const { steps, index, vars, executionId } = payload;
+  const { streams } = ctx;
 
+  // ✅ Workflow finished
   if (index >= steps.length) {
+    await streams.executionLog.set(executionId, `finish-${Date.now()}`, {
+      executionId,
+      level: "info",
+      message: "Workflow finished",
+      timestamp: Date.now(),
+    });
+
     console.log("✅ Workflow finished:", executionId);
     return;
   }
@@ -37,21 +45,19 @@ export const handler: StepHandler<typeof config> = async (
     executionId
   );
 
-  await ctx.emit({
-    topic: "workflow.log",
-    data: {
-      executionId,
-      level: "info",
-      message: `Executing step ${index}: ${step.type}`,
-      step: step.type,
-      index,
-      timestamp: Date.now(),
-    },
+  // ✅ STREAM LOG TO FRONTEND
+  await streams.executionLog.set(executionId, `step-${index}-${Date.now()}`, {
+    executionId,
+    level: "info",
+    message: `Executing step ${index}: ${step.type}`,
+    step: step.type,
+    index,
+    timestamp: Date.now(),
   });
 
   // 🔁 Dispatch to actual step handler
   await ctx.emit({
-    topic: step.type, // dbFind, dbInsert, delay, etc.
+    topic: step.type,
     data: {
       ...step,
       steps,

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { ClientProvider } from "@/components/ClientProvider";
+import { MotiaClientProvider } from "@/components/MotiaClientProvider";
 
 export const metadata: Metadata = {
   title: "Create Next App",
@@ -15,7 +16,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body suppressHydrationWarning>
-        <ClientProvider>{children}</ClientProvider>
+        <MotiaClientProvider>
+          {" "}
+          <ClientProvider>{children}</ClientProvider>
+        </MotiaClientProvider>
       </body>
     </html>
   );

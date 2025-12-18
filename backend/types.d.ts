@@ -8,16 +8,15 @@ import { EventHandler, ApiRouteHandler, ApiResponse, MotiaStream, CronHandler } 
 
 declare module 'motia' {
   interface FlowContextStateStreams {
-    
+    'executionLog': MotiaStream<{ executionId: string; level: 'info' | 'debug' | 'error'; message: string; step?: string; index?: number; timestamp: number }>
   }
 
   interface Handlers {
     'workflow.start': EventHandler<never, { topic: 'workflow.run'; data: never }>
-    'workflow.run': EventHandler<never, { topic: 'input'; data: never } | { topic: 'dbFind'; data: never } | { topic: 'dbInsert'; data: never } | { topic: 'dbUpdate'; data: never } | { topic: 'delay'; data: never } | { topic: 'authMiddleware'; data: never } | { topic: 'emailSend'; data: never } | { topic: 'workflow.log'; data: never }>
-    'workflow.log': EventHandler<never, never>
+    'workflow.run': EventHandler<never, { topic: 'input'; data: never } | { topic: 'dbFind'; data: never } | { topic: 'dbInsert'; data: never } | { topic: 'dbUpdate'; data: never } | { topic: 'delay'; data: never } | { topic: 'authMiddleware'; data: never } | { topic: 'emailSend'; data: never }>
     'saveWorkflow': ApiRouteHandler<Record<string, unknown>, unknown, never>
     'runWorkflow': ApiRouteHandler<Record<string, unknown>, unknown, { topic: 'workflow.run'; data: never }>
-    'input': EventHandler<never, { topic: 'workflow.run'; data: never } | { topic: 'workflow.log'; data: never }>
+    'input': EventHandler<never, { topic: 'workflow.run'; data: never }>
     'generateWorkflow': ApiRouteHandler<Record<string, unknown>, unknown, never>
     'ExecutionLogs': ApiRouteHandler<Record<string, unknown>, unknown, never>
     'executeWorkflow': ApiRouteHandler<Record<string, unknown>, unknown, { topic: 'workflow.start'; data: never }>

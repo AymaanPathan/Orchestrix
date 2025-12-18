@@ -35,7 +35,7 @@ import { validateGraph } from "@/components/workflow/validation/validateGraph";
 import { RootDispatch, RootState } from "@/store";
 import { useDispatch, useSelector } from "react-redux";
 import AnimatedDashedEdge from "@/components/Ui/AnimatedDashedEdge";
-import { socket } from "@/utils/socket";
+import { useStreamGroup } from "@motiadev/stream-client-react";
 type ExecutionLog = {
   executionId: string;
   level: "info" | "debug" | "error";
@@ -274,15 +274,29 @@ export default function WorkflowPage() {
       setIsSaving(false);
     }
   };
+  const executionId = execution?.executionId ?? null;
 
+  const { data: streamLogs } = useStreamGroup({
+    streamName: "executionLog",
+    groupId: executionId ?? undefined, // 🔑 important
+  });
   useEffect(() => {
-    if (!socket.connected) {
-      socket.connect();
-    }
-    socket.on("connect", () => {
-      console.log("✅ socket connected", socket.id);
+    if (!executionId) return;
+
+    setExecution((prev) => {
+      if (!prev) return prev;
+
+      return {
+        ...prev,
+        logs: streamLogs,
+        finished: streamLogs.some(
+          (l) =>
+            l.level === "info" &&
+            l.message.toLowerCase().includes("workflow finished")
+        ),
+      };
     });
-  }, []);
+  }, [streamLogs, executionId]);
 
   const runWorkflow = async () => {
     try {
@@ -302,9 +316,9 @@ export default function WorkflowPage() {
 
     const output = await res.json();
     console.log("🚀 Execution started:", output);
+
     if (!output.executionId) return;
 
-    // ✅ init execution sidebar
     setExecution({
       executionId: output.executionId,
       logs: [],
@@ -312,10 +326,8 @@ export default function WorkflowPage() {
     });
 
     setLogsOpen(true);
-
-    // 🔥 join execution room
-    socket.emit("join", output.executionId);
   };
+
   // NODE SAVE HANDLER
   const handleSaveNode = (id: string, newData: any) => {
     setNodes((curr) => saveNodeChanges(id, newData, curr));

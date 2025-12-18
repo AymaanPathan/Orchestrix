@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@motiadev/stream-client-react": "^0.17.9-beta.191",
     "@reduxjs/toolkit": "^2.11.2",
     "@tailwindcss/postcss": "^4.1.18",
     "@xyflow/react": "^12.10.0",
