@@ -33,7 +33,7 @@ export function buildForExecute(nodes: any[], edges: any[]) {
     const stepId = `step${counter++}`;
 
     // --------------------------------------------------
-    // INPUT NODE (MUST EXECUTE)
+    // INPUT NODE
     // --------------------------------------------------
     if (node.type === "input") {
       steps.push({
@@ -74,11 +74,12 @@ export function buildForExecute(nodes: any[], edges: any[]) {
       const to =
         raw.to && raw.to.trim()
           ? transformTemplates(raw.to, inputVars)
-          : "input.email"; // 👈 fallback
+          : "input.email";
+
       steps.push({
         id: stepId,
         type: "emailSend",
-        to: to,
+        to,
         subject: transformTemplates(raw.subject, inputVars),
         body: transformTemplates(raw.body, inputVars),
         output: raw.outputVar || "emailResult",
@@ -88,18 +89,74 @@ export function buildForExecute(nodes: any[], edges: any[]) {
     }
 
     // --------------------------------------------------
-    // GENERIC STEPS (dbFind, dbInsert, dbUpdate, etc.)
+    // DB INSERT
+    // --------------------------------------------------
+    if (node.type === "dbInsert") {
+      const { collection, output, ...rest } = transformed;
+
+      steps.push({
+        id: stepId,
+        type: "dbInsert",
+        collection,
+        data: rest, 
+        output: output || "created",
+        pass: node.data?.pass,
+      });
+
+      continue;
+    }
+
+    // --------------------------------------------------
+    // DB UPDATE
+    // --------------------------------------------------
+    if (node.type === "dbUpdate") {
+      steps.push({
+        id: stepId,
+        type: "dbUpdate",
+        collection: transformed.collection,
+        filter: transformed.filter || {},
+        data: transformed.data || {},
+        output: transformed.output || "updated",
+        pass: node.data?.pass,
+      });
+      continue;
+    }
+
+    // --------------------------------------------------
+    // DB FIND
+    // --------------------------------------------------
+    if (node.type === "dbFind") {
+      steps.push({
+        id: stepId,
+        type: "dbFind",
+        collection: transformed.collection,
+        filter: transformed.filter || {},
+        findType: transformed.findType || "one",
+        output: transformed.output || "found",
+        pass: node.data?.pass,
+      });
+      continue;
+    }
+
+    // --------------------------------------------------
+    // FALLBACK (CUSTOM STEPS)
     // --------------------------------------------------
     steps.push({
       id: stepId,
       type: node.type,
-      pass: node.data?.pass,
       ...transformed,
+      pass: node.data?.pass,
     });
   }
-  console.log("STEPS SENT TO ENGINE:", steps);
 
-  return { steps, input };
+  console.log("🧠 STEPS SENT TO ENGINE:", steps);
+
+  return {
+    steps,
+    vars: {
+      input,
+    },
+  };
 }
 
 /* =========================================================

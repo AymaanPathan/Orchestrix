@@ -24,8 +24,6 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
   const start = Date.now();
   const { streams } = ctx;
 
-  await connectMongo();
-
   const {
     collection,
     filters,
@@ -37,73 +35,80 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
     executionId,
   } = payload;
 
-  // ───────────────── START ─────────────────
-  await streams.executionLog.set(executionId, `dbfind-start-${index}`, {
-    executionId,
-    stepIndex: index,
-    stepType: "dbFind",
-    phase: "start",
-    title: "DB Find started",
-    timestamp: Date.now(),
-  });
+  try {
+    await connectMongo();
 
-  // ───────────── METADATA ─────────────
-  await streams.executionLog.set(executionId, `dbfind-meta-${index}`, {
-    executionId,
-    stepIndex: index,
-    stepType: "dbFind",
-    phase: "data",
-    title: "Query metadata",
-    data: { collection, findType, rawFilters: filters },
-    timestamp: Date.now(),
-  });
+    logStepStart(index, "dbFind");
+    logKV("Collection", collection);
+    logKV("Raw filters", filters);
+    logKV("Vars", vars);
 
-  const resolvedFilters = resolveObject(vars, filters);
-
-  await streams.executionLog.set(executionId, `dbfind-resolved-${index}`, {
-    executionId,
-    stepIndex: index,
-    stepType: "dbFind",
-    phase: "data",
-    title: "Resolved filters",
-    data: resolvedFilters,
-    timestamp: Date.now(),
-  });
-
-  const Model = mongoose.connection.models[collection];
-  const result =
-    findType === "many"
-      ? await Model.find(resolvedFilters)
-      : await Model.findOne(resolvedFilters);
-
-  await streams.executionLog.set(executionId, `dbfind-result-${index}`, {
-    executionId,
-    stepIndex: index,
-    stepType: "dbFind",
-    phase: "data",
-    title: "Query result",
-    data: result,
-    timestamp: Date.now(),
-  });
-
-  // ───────────────── END ─────────────────
-  await streams.executionLog.set(executionId, `dbfind-end-${index}`, {
-    executionId,
-    stepIndex: index,
-    stepType: "dbFind",
-    phase: "end",
-    title: "DB Find completed",
-    durationMs: Date.now() - start,
-    timestamp: Date.now(),
-  });
-
-  await ctx.emit({
-    topic: "workflow.run",
-    data: {
-      steps,
-      index: index + 1,
-      vars: { ...vars, [output]: result },
+    // ───────── STREAM: START ─────────
+    await streams.executionLog.set(executionId, `dbfind-start-${index}`, {
       executionId,
-    },
-  });
+      stepIndex: index,
+      stepType: "dbFind",
+      phase: "start",
+      title: "DB Find started",
+      timestamp: Date.now(),
+    });
+
+    const resolvedFilters = resolveObject(vars, filters);
+    logKV("Resolved filters", resolvedFilters);
+
+    await streams.executionLog.set(executionId, `dbfind-resolved-${index}`, {
+      executionId,
+      stepIndex: index,
+      stepType: "dbFind",
+      phase: "data",
+      title: "Resolved filters",
+      data: resolvedFilters,
+      timestamp: Date.now(),
+    });
+
+    const Model = mongoose.connection.models[collection];
+    if (!Model) throw new Error(`Model not registered: ${collection}`);
+
+    const result =
+      findType === "many"
+        ? await Model.find(resolvedFilters)
+        : await Model.findOne(resolvedFilters);
+
+    logKV("Query result", result);
+
+    await streams.executionLog.set(executionId, `dbfind-result-${index}`, {
+      executionId,
+      stepIndex: index,
+      stepType: "dbFind",
+      phase: "data",
+      title: "Query result",
+      data: result,
+      timestamp: Date.now(),
+    });
+
+    await streams.executionLog.set(executionId, `dbfind-end-${index}`, {
+      executionId,
+      stepIndex: index,
+      stepType: "dbFind",
+      phase: "end",
+      title: "DB Find completed",
+      durationMs: Date.now() - start,
+      timestamp: Date.now(),
+    });
+
+    logSuccess("dbFind", Date.now() - start);
+
+    await ctx.emit({
+      topic: "workflow.run",
+      data: {
+        steps,
+        index: index + 1,
+        vars: { ...vars, [output]: result },
+        executionId,
+      },
+    });
+  } catch (err) {
+    logError("dbFind", err);
+    throw err;
+  }
 };

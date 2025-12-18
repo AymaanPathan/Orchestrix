@@ -19,61 +19,63 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
 
   const { data, vars = {}, steps, index, executionId } = payload;
 
-  // ───────────────── START ─────────────────
-  await streams.executionLog.set(executionId, `input-start-${index}`, {
-    executionId,
-    stepIndex: index,
-    stepType: "input",
-    phase: "start",
-    title: "Input step started",
-    timestamp: Date.now(),
-  });
+  try {
+    logStepStart(index, "input");
+    logKV("Raw variables config", data?.variables);
+    logKV("Incoming vars.input", vars.input);
 
-  // ───────────── RAW CONFIG ─────────────
-  await streams.executionLog.set(executionId, `input-raw-${index}`, {
-    executionId,
-    stepIndex: index,
-    stepType: "input",
-    phase: "data",
-    title: "Raw variables config",
-    data: data.variables,
-    timestamp: Date.now(),
-  });
-
-  // ─────────── RESOLVE INPUT ───────────
-  const resolvedInput: any = {};
-  for (const v of data.variables || []) {
-    resolvedInput[v.name] = vars.input?.[v.name] ?? v.default ?? null;
-  }
-
-  await streams.executionLog.set(executionId, `input-resolved-${index}`, {
-    executionId,
-    stepIndex: index,
-    stepType: "input",
-    phase: "data",
-    title: "Resolved input values",
-    data: resolvedInput,
-    timestamp: Date.now(),
-  });
-
-  // ───────────────── END ─────────────────
-  await streams.executionLog.set(executionId, `input-end-${index}`, {
-    executionId,
-    stepIndex: index,
-    stepType: "input",
-    phase: "end",
-    title: "Input completed",
-    durationMs: Date.now() - start,
-    timestamp: Date.now(),
-  });
-
-  await ctx.emit({
-    topic: "workflow.run",
-    data: {
-      steps,
-      index: index + 1,
-      vars: { ...vars, input: resolvedInput },
+    // ───────── STREAM: START ─────────
+    await streams.executionLog.set(executionId, `input-start-${index}`, {
       executionId,
-    },
-  });
+      stepIndex: index,
+      stepType: "input",
+      phase: "start",
+      title: "Input step started",
+      timestamp: Date.now(),
+    });
+
+    const resolvedInput: any = {};
+    for (const v of data.variables || []) {
+      resolvedInput[v.name] = vars.input?.[v.name] ?? v.default ?? null;
+    }
+
+    logKV("Resolved input", resolvedInput);
+
+    // ───────── STREAM: DATA ─────────
+    await streams.executionLog.set(executionId, `input-resolved-${index}`, {
+      executionId,
+      stepIndex: index,
+      stepType: "input",
+      phase: "data",
+      title: "Resolved input values",
+      data: resolvedInput,
+      timestamp: Date.now(),
+    });
+
+    // ───────── STREAM: END ─────────
+    await streams.executionLog.set(executionId, `input-end-${index}`, {
+      executionId,
+      stepIndex: index,
+      stepType: "input",
+      phase: "end",
+      title: "Input completed",
+      durationMs: Date.now() - start,
+      timestamp: Date.now(),
+    });
+
+    logSuccess("input", Date.now() - start);
+
+    await ctx.emit({
+      topic: "workflow.run",
+      data: {
+        steps,
+        index: index + 1,
+        vars: { ...vars, input: resolvedInput },
+        executionId,
+      },
+    });
+  } catch (err) {
+    logError("input", err);
+    throw err;
+  }
 };
