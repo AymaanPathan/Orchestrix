@@ -1,4 +1,3 @@
-// src/steps/workflow.run.step.ts
 import { EventConfig, StepHandler } from "motia";
 
 function assertNoUndefined(step: any, stepType: string) {

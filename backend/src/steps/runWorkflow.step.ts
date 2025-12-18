@@ -1,27 +1,45 @@
 import { ApiRouteConfig, StepHandler } from "motia";
 import Workflow from "../models/workflow.model";
+import PublishedApi from "../models/publishedApi.model";
 import { connectMongo } from "../lib/mongo";
-import mongoose from "mongoose";
-import { v4 as uuid } from "uuid";
+import { runEngine } from "../engine/workflowEngine";
 
 export const config: ApiRouteConfig = {
-  name: "runWorkflow",
+  name: "runWorkflowPublic",
   type: "api",
-  method: "POST",
   path: "/workflow/run/:workflowId/:apiName",
-  emits: ["workflow.run"],
+  method: "POST",
+  emits: [],
 };
 
 export const handler: StepHandler<typeof config> = async (req, ctx) => {
   await connectMongo();
+  const { logger } = ctx;
 
-  if (mongoose.connection.readyState !== 1) {
-    await new Promise((r) => mongoose.connection.once("connected", r));
+  const { workflowId, apiName } = req.pathParams || {};
+
+  if (!workflowId || !apiName) {
+    return {
+      status: 400,
+      body: { error: "Invalid workflow path" },
+    };
   }
 
-  const { workflowId } = req.pathParams!;
-  const workflow = await Workflow.findOne({ workflowId });
+  // ✅ Ensure API is published
+  const api = await PublishedApi.findOne({
+    workflowId,
+    slug: apiName,
+  });
 
+  if (!api) {
+    return {
+      status: 404,
+      body: { error: "API not published" },
+    };
+  }
+
+  // ✅ Load workflow
+  const workflow = await Workflow.findOne({ workflowId });
   if (!workflow) {
     return {
       status: 404,
@@ -29,21 +47,19 @@ export const handler: StepHandler<typeof config> = async (req, ctx) => {
     };
   }
 
-  const executionId = uuid();
+  const input = req.body || {};
 
-  // 🔥 USE STORED RUNTIME STEPS AS-IS
-  await ctx.emit({
-    topic: "workflow.run",
-    data: {
-      steps: workflow.steps,
-      index: 0,
-      vars: { input: req.body || {} },
-      executionId,
-    },
+  logger.info("Running published workflow", {
+    workflowId,
+    api: api.name,
+    input,
   });
+
+  // 🔥 SYNC HTTP EXECUTION
+  const result = await runEngine(workflow.steps, input, req.headers);
 
   return {
     status: 200,
-    body: { ok: true, executionId },
+    body: result,
   };
 };
