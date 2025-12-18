@@ -54,15 +54,7 @@ export function buildForExecute(nodes: any[], edges: any[]) {
       steps.push({
         id: stepId,
         type: "inputValidation",
-        rules: (raw.rules || []).map((r: any) => ({
-          ...r,
-          field:
-            typeof r.field === "string"
-              ? r.field.replace(/^{{\s*|\s*}}$/g, "").startsWith("input.")
-                ? r.field.replace(/^{{\s*|\s*}}$/g, "")
-                : `input.${r.field.replace(/^{{\s*|\s*}}$/g, "")}`
-              : r.field,
-        })),
+        rules: raw.rules || [],
         output: raw.outputVar || "validated",
         pass: node.data?.pass,
       });

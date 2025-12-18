@@ -6,6 +6,7 @@ import { resolveObject } from "../lib/resolveValue";
 import { resolveTemplate } from "../flows/templateResolver";
 import { sendEmail } from "../lib/email";
 import { connectMongo } from "../lib/mongo";
+import { getModel } from "../lib/getModel";
 
 export async function runEngine(steps: any[], input: any, headers: any = {}) {
   connectMongo();
@@ -62,17 +63,7 @@ export async function runEngine(steps: any[], input: any, headers: any = {}) {
       // 3️⃣ DB FIND
       // ------------------------------------------------
       if (step.type === "dbFind") {
-        const modelName =
-          step.model ||
-          step.collection?.charAt(0).toUpperCase() +
-            step.collection?.slice(1).replace(/s$/, "");
-
-        const Model =
-          mongoose.connection.models[step.model] ||
-          mongoose.connection.models[step.collection] ||
-          mongoose.connection.models[
-            step.collection?.charAt(0).toUpperCase() + step.collection?.slice(1)
-          ];
+        const Model = getModel(step);
 
         if (!Model) {
           throw new Error(`Model not found: ${step.model || step.collection}`);
@@ -93,13 +84,10 @@ export async function runEngine(steps: any[], input: any, headers: any = {}) {
       // 4️⃣ DB INSERT
       // ------------------------------------------------
       if (step.type === "dbInsert") {
-        const modelName =
-          step.model ||
-          step.collection?.charAt(0).toUpperCase() +
-            step.collection?.slice(1).replace(/s$/, "");
+        const Model = getModel(step);
 
-        const Model = mongoose.connection.models[modelName];
-        if (!Model) throw new Error(`Model not found: ${modelName}`);
+        if (!Model)
+          throw new Error(`Model not found: ${step.model || step.collection}`);
 
         const rawData = step.data?.data || {};
         const data = resolveObject(vars, rawData);
@@ -121,12 +109,7 @@ export async function runEngine(steps: any[], input: any, headers: any = {}) {
       // 5️⃣ DB UPDATE
       // ------------------------------------------------
       if (step.type === "dbUpdate") {
-        const Model =
-          mongoose.connection.models[step.model] ||
-          mongoose.connection.models[step.collection] ||
-          mongoose.connection.models[
-            step.collection?.charAt(0).toUpperCase() + step.collection?.slice(1)
-          ];
+        const Model = getModel(step);
 
         if (!Model) {
           throw new Error(`Model not found: ${step.model || step.collection}`);
@@ -173,6 +156,12 @@ export async function runEngine(steps: any[], input: any, headers: any = {}) {
         const to = resolveTemplate(step.to, vars);
         const subject = resolveTemplate(step.subject, vars);
         const body = resolveTemplate(step.body, vars);
+
+        console.log("📧 Sending email (RESOLVED)", {
+          to,
+          subject,
+          body,
+        });
 
         const result = await sendEmail({ to, subject, body });
 

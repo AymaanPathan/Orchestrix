@@ -1,23 +1,22 @@
-export function resolveTemplate(str: string, vars: any): any {
-  if (typeof str !== "string") return str;
+export function resolveTemplate(template: any, vars: Record<string, any>) {
+  if (typeof template !== "string") return template;
 
-  return str.replace(/{{\s*(.*?)\s*}}/g, (_, key) => {
-    key = key.trim();
+  return template.replace(/{{\s*([^}]+)\s*}}/g, (_, expr) => {
+    const path = expr.trim().split(".");
+    let value: any = vars;
 
-    // --- 1. Direct match: {{email}} -> vars.email ---
-    if (vars[key] !== undefined) return vars[key];
+    for (const key of path) {
+      if (value == null) return "";
 
-    // --- 2. Input fallback: {{email}} -> vars["input.email"] ---
-    if (vars[`input.${key}`] !== undefined) return vars[`input.${key}`];
+      // 🔥 FIX: unwrap mongoose documents DURING traversal
+      if (value && typeof value === "object" && "_doc" in value) {
+        value = value._doc;
+      }
 
-    // --- 3. Nested lookup: {{foundUser.email}} ---
-    const parts = key.split(".");
-    let cur = vars;
-    for (const p of parts) {
-      if (cur == null) return "";
-      cur = cur[p];
+      value = value[key];
     }
-    return cur ?? "";
+
+    return value ?? "";
   });
 }
 

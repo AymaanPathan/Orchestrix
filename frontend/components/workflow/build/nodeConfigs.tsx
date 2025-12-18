@@ -437,12 +437,12 @@ export const useNodeConfigs = () => {
               </select>
             </div>
 
-            {collection && schemaFields.length > 0 && (
+            {collection && schemaFields?.length > 0 && (
               <div className="space-y-2">
                 <label className="text-xs text-neutral-400 font-medium">
                   Field Mappings
                 </label>
-                {schemaFields.map((field) => (
+                {schemaFields?.map((field) => (
                   <div
                     key={field}
                     className="flex gap-2 bg-neutral-950 border border-neutral-800 p-3 rounded-lg items-center hover:border-neutral-700 transition-colors"

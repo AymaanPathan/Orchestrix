@@ -18,7 +18,36 @@ export function resolveValue(vars: Record<string, any>, value: any): any {
 export function resolveObject(vars: any, value: any): any {
   // STRING
   if (typeof value === "string") {
-    // Only resolve if first segment exists in vars
+    // Check if string contains {{}} template expressions
+    if (value.includes("{{")) {
+      // Replace all {{variable.path}} with actual values
+      return value.replace(/\{\{([^}]+)\}\}/g, (match, varPath) => {
+        const trimmedPath = varPath.trim();
+        const [root, ...pathParts] = trimmedPath.split(".");
+
+        // Check if root exists in vars
+        if (root in vars) {
+          let current = vars[root];
+
+          // Navigate the path
+          for (const key of pathParts) {
+            if (current == null) {
+              // If path doesn't exist, return the original template
+              return match;
+            }
+            current = current[key];
+          }
+
+          // Return the resolved value or the original if undefined
+          return current !== undefined ? current : match;
+        }
+
+        // If root doesn't exist in vars, return original template
+        return match;
+      });
+    }
+
+    // Handle direct dot notation (backward compatibility)
     const [root, ...path] = value.split(".");
 
     if (root in vars && path.length > 0) {
