@@ -151,24 +151,47 @@ export async function runEngine(steps: any[], input: any, headers: any = {}) {
       // 7️⃣ EMAIL SEND
       // ------------------------------------------------
       if (step.type === "emailSend") {
-        // ✅ Use resolveObject to handle both {{var}} and dot notation
+        // ✅ Resolve all email fields using resolveObject
+        // This handles both {{var}} templates and direct dot notation
         const to = resolveObject(vars, step.to);
         const subject = resolveObject(vars, step.subject);
         const body = resolveObject(vars, step.body);
 
-        console.log("📧 Sending email (RESOLVED)", {
-          to,
-          subject,
-          body,
-          originalTo: step.to,
-          originalSubject: step.subject,
-          originalBody: step.body,
+        console.log("📧 Email Send - Resolution Debug", {
+          original: {
+            to: step.to,
+            subject: step.subject,
+            body: step.body?.substring(0, 100) + "...",
+          },
+          resolved: {
+            to,
+            subject,
+            body: body?.substring(0, 100) + "...",
+          },
+          vars: {
+            input: vars.input,
+          },
         });
+
+        // Validate resolved values
+        if (!to || !subject || !body) {
+          throw new Error(
+            `Email fields missing after resolution. To: ${to}, Subject: ${subject}, Body: ${!!body}`
+          );
+        }
 
         const result = await sendEmail({ to, subject, body });
 
         vars[step.output || "emailResult"] = result;
-        logs.push({ step: index, result });
+        logs.push({
+          step: index,
+          result,
+          email: {
+            to,
+            subject,
+            sent: result.success,
+          },
+        });
         continue;
       }
 

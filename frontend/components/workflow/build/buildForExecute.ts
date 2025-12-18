@@ -131,7 +131,7 @@ export function buildForExecute(nodes: any[], edges: any[]) {
         pass: node.data?.pass,
       });
 
-      continue; // 🚨 REQUIRED
+      continue;
     }
   }
 
@@ -218,6 +218,12 @@ function topologicalSort(nodes: any[], edges: any[]) {
   return orderedIds.map((id) => idToNode.get(id)).filter(Boolean);
 }
 
+/**
+ * Transform template variables in strings
+ * Handles BOTH:
+ * 1. Full templates: "{{email}}" -> "input.email"
+ * 2. Partial templates: "hello {{email}}" -> "hello {{input.email}}"
+ */
 function transformTemplates(obj: any, inputVars: string[]): any {
   if (Array.isArray(obj)) {
     return obj.map((v) => transformTemplates(v, inputVars));
@@ -232,18 +238,35 @@ function transformTemplates(obj: any, inputVars: string[]): any {
   }
 
   if (typeof obj === "string") {
-    // ⚠️ ONLY transform FULL {{var}} expressions
-    const full = obj.match(/^{{\s*([^}]+)\s*}}$/);
-    if (!full) return obj;
+    // Check if it's a FULL template expression (entire string is {{var}})
+    const fullMatch = obj.match(/^{{\s*([^}]+)\s*}}$/);
+    if (fullMatch) {
+      const varPath = fullMatch[1].trim();
+      const root = varPath.split(".")[0];
 
-    const varPath = full[1].trim();
-    const root = varPath.split(".")[0];
+      // If it's an input variable, prefix with "input."
+      if (inputVars.includes(root)) {
+        return `input.${varPath}`;
+      }
 
-    if (inputVars.includes(root)) {
-      return `input.${varPath}`;
+      return varPath;
     }
 
-    return varPath;
+    // Handle PARTIAL templates (e.g., "hello {{email}} world")
+    // Replace ALL {{var}} occurrences in the string
+    const transformed = obj.replace(/{{\s*([^}]+)\s*}}/g, (match, varPath) => {
+      const trimmed = varPath.trim();
+      const root = trimmed.split(".")[0];
+
+      // If it's an input variable, prefix with "input."
+      if (inputVars.includes(root)) {
+        return `{{input.${trimmed}}}`;
+      }
+
+      return `{{${trimmed}}}`;
+    });
+
+    return transformed;
   }
 
   return obj;
