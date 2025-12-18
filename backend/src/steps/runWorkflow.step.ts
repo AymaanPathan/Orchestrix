@@ -13,14 +13,10 @@ export const config: ApiRouteConfig = {
 };
 
 export const handler: StepHandler<typeof config> = async (req, ctx) => {
-  // 🔴 THIS WAS MISSING
   await connectMongo();
 
-  // 🔴 ENSURE CONNECTION IS READY
   if (mongoose.connection.readyState !== 1) {
-    await new Promise((resolve) =>
-      mongoose.connection.once("connected", resolve)
-    );
+    await new Promise((r) => mongoose.connection.once("connected", r));
   }
 
   const { workflowId } = req.pathParams!;
@@ -34,8 +30,8 @@ export const handler: StepHandler<typeof config> = async (req, ctx) => {
   }
 
   const executionId = uuid();
-  console.log("🚀 WORKFLOW START", executionId);
 
+  // 🔥 USE STORED RUNTIME STEPS AS-IS
   await ctx.emit({
     topic: "workflow.run",
     data: {
@@ -48,9 +44,6 @@ export const handler: StepHandler<typeof config> = async (req, ctx) => {
 
   return {
     status: 200,
-    body: {
-      ok: true,
-      executionId,
-    },
+    body: { ok: true, executionId },
   };
 };

@@ -242,41 +242,18 @@ export default function WorkflowPage() {
 
   // ACTUAL SAVE - Called from modal with apiName
   const handleSaveWithApiName = async (apiName: string) => {
-    setIsSaving(true);
+    const payload = buildForSave(nodes, edges);
 
-    try {
-      const payload = buildForSave(nodes, edges);
+    const res = await fetch("http://localhost:3000/workflows/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...payload, apiName }),
+    });
 
-      const res = await fetch("http://localhost:3000/workflows/save", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...payload,
-          apiName, // Add the API name to the payload
-        }),
-      });
-
-      const result = await res.json();
-
-      if (result.ok) {
-        // Set the saved data to show success screen
-        setSavedWorkflowData({
-          workflowId: result.workflow.workflowId,
-          apiPath: result.api.path,
-          apiName: result.api.name,
-        });
-      } else {
-        alert("Failed to save workflow: " + (result.error || "Unknown error"));
-        setSaveModalOpen(false);
-      }
-    } catch (error) {
-      console.error("Save error:", error);
-      alert("Failed to save workflow");
-      setSaveModalOpen(false);
-    } finally {
-      setIsSaving(false);
-    }
+    const result = await res.json();
+    if (!result.ok) throw new Error("Save failed");
   };
+
   const executionId = execution?.executionId ?? null;
 
   const { data: streamLogs } = useStreamGroup<ExecutionLog>({

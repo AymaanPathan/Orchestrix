@@ -69,20 +69,20 @@ export const nodeTemplates = [
     color: "orange",
   },
   // Login
-  {
-    type: "userLogin",
-    label: "users Login",
-    description: "Authenticate a user",
-    icon: <ShieldCheck size={16} />,
-    color: "orange",
-  },
-  {
-    type: "authMiddleware",
-    label: "Auth Middleware",
-    description: "Authenticate requests",
-    icon: <ShieldCheck size={16} />,
-    color: "orange",
-  },
+  // {
+  //   type: "userLogin",
+  //   label: "users Login",
+  //   description: "Authenticate a user",
+  //   icon: <ShieldCheck size={16} />,
+  //   color: "orange",
+  // },
+  // {
+  //   type: "authMiddleware",
+  //   label: "Auth Middleware",
+  //   description: "Authenticate requests",
+  //   icon: <ShieldCheck size={16} />,
+  //   color: "orange",
+  // },
   {
     type: "delay",
     label: "Delay",
@@ -90,26 +90,26 @@ export const nodeTemplates = [
     icon: <Clock size={16} />,
     color: "yellow",
   },
-  {
-    type: "loop",
-    label: "Loop",
-    description: "Repeat for each item",
-    icon: <Repeat size={16} />,
-    color: "pink",
-  },
+  // {
+  //   type: "loop",
+  //   label: "Loop",
+  //   description: "Repeat for each item",
+  //   icon: <Repeat size={16} />,
+  //   color: "pink",
+  // },
 
-  {
-    type: "eventStep",
-    label: "Motia Event Step",
-    description: "Event trigger step",
-    icon: <Play size={16} />,
-    color: "blue",
-  },
-  {
-    type: "backgroundStep",
-    label: "Motia Background Step",
-    description: "Background job step",
-    icon: <Layers size={16} />,
-    color: "green",
-  },
+  // {
+  //   type: "eventStep",
+  //   label: "Motia Event Step",
+  //   description: "Event trigger step",
+  //   icon: <Play size={16} />,
+  //   color: "blue",
+  // },
+  // {
+  //   type: "backgroundStep",
+  //   label: "Motia Background Step",
+  //   description: "Background job step",
+  //   icon: <Layers size={16} />,
+  //   color: "green",
+  // },
 ];

@@ -1,14 +1,13 @@
 import { ApiRouteConfig, StepHandler } from "motia";
 import Workflow from "../models/workflow.model";
-import { connectMongo } from "../lib/mongo";
 import PublishedApi from "../models/publishedApi.model";
+import { connectMongo } from "../lib/mongo";
 
 export const config: ApiRouteConfig = {
   name: "saveWorkflow",
   type: "api",
   path: "/workflows/save",
   method: "POST",
-  flows: ["WorkflowBuilder"],
   emits: [],
 };
 
@@ -18,11 +17,21 @@ export const handler: StepHandler<typeof config> = async (req, ctx) => {
 
   const { workflowId, ownerId, steps, apiName } = req.body;
 
-  if (!workflowId || !ownerId || !steps || !apiName) {
+  if (!workflowId || !ownerId || !Array.isArray(steps) || !apiName) {
     return {
       status: 400,
       body: { error: "workflowId, ownerId, steps, apiName required" },
     };
+  }
+
+  // 🔒 SAFETY: ensure runtime-compatible steps
+  for (const step of steps) {
+    if (!step.type) {
+      return {
+        status: 400,
+        body: { error: "Invalid workflow step format" },
+      };
+    }
   }
 
   // 1️⃣ Save workflow
@@ -32,42 +41,34 @@ export const handler: StepHandler<typeof config> = async (req, ctx) => {
     { upsert: true, new: true }
   );
 
-  // 2️⃣ Generate slug + path
-  const apiSlug = toApiSlug(apiName);
-  const apiPath = `/workflow/run/${workflowId}/${apiSlug}`;
+  // 2️⃣ Publish API
+  const slug = toApiSlug(apiName);
+  const path = `/workflow/run/${workflowId}/${slug}`;
 
-  // 3️⃣ Save published API
   await PublishedApi.findOneAndUpdate(
-    { path: apiPath },
+    { path, ownerId },
     {
-      name: apiName, // original name
       workflowId,
       ownerId,
+      name: apiName,
+      slug,
       method: "POST",
-      slug: apiSlug,
     },
     { upsert: true, new: true }
   );
 
-  logger.info("WORKFLOW SAVED & API PUBLISHED", {
-    workflowId,
-    apiPath,
-  });
+  logger.info("✅ Workflow saved & API published", { path });
 
   return {
     status: 200,
     body: {
       ok: true,
-      workflow,
-      api: {
-        path: apiPath,
-        name: apiName,
-      },
+      workflowId,
+      api: { path, name: apiName },
     },
   };
 };
 
-// ------------------ helpers ------------------
 function toApiSlug(name: string) {
   return name
     .trim()
