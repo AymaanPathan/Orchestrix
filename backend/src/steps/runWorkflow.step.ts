@@ -1,60 +1,56 @@
-// Import models to ensure they're registered
-import "../models/user.model.js";
-import "../models/workflow.model.js";
-import "../models/publishedApi.model.js";
 import { ApiRouteConfig, StepHandler } from "motia";
 import Workflow from "../models/workflow.model";
-import PublishedApi from "../models/publishedApi.model";
 import { connectMongo } from "../lib/mongo";
-import { runEngine } from "../lib/workflowEngine";
+import mongoose from "mongoose";
+import { v4 as uuid } from "uuid";
 
 export const config: ApiRouteConfig = {
-  name: "runWorkflowPublic",
+  name: "runWorkflow",
   type: "api",
-  path: "/workflow/run/:workflowId/:apiName",
   method: "POST",
-  flows: ["WorkflowRunner"],
-  emits: [],
+  path: "/workflow/run/:workflowId/:apiName",
+  emits: ["workflow.run"],
 };
 
-export const handler: StepHandler<typeof config> = async (data, ctx) => {
+export const handler: StepHandler<typeof config> = async (req, ctx) => {
+  // 🔴 THIS WAS MISSING
   await connectMongo();
-  const { logger } = ctx;
 
-  const { workflowId, apiName } = data.pathParams || {};
-
-  if (!workflowId) {
-    return { status: 400, body: { error: "workflowId missing in path" } };
+  // 🔴 ENSURE CONNECTION IS READY
+  if (mongoose.connection.readyState !== 1) {
+    await new Promise((resolve) =>
+      mongoose.connection.once("connected", resolve)
+    );
   }
 
-  const api = await PublishedApi.findOne({ workflowId, slug: apiName });
-  if (!api) {
-    return { status: 404, body: { error: "API not published" } };
-  }
-
+  const { workflowId } = req.pathParams!;
   const workflow = await Workflow.findOne({ workflowId });
+
   if (!workflow) {
-    return { status: 404, body: { error: "Workflow not found" } };
+    return {
+      status: 404,
+      body: { error: "Workflow not found" },
+    };
   }
 
-  const executionId = crypto.randomUUID();
+  const executionId = uuid();
+  console.log("🚀 WORKFLOW START", executionId);
 
   await ctx.emit({
-    topic: "workflow.start",
+    topic: "workflow.run",
     data: {
       steps: workflow.steps,
       index: 0,
-      vars: {
-        input: data.body || {},
-      },
+      vars: { input: req.body || {} },
       executionId,
     },
   });
 
-  logger.info("Public workflow started", { workflowId, executionId });
-
   return {
     status: 200,
-    body: { ok: true, executionId },
+    body: {
+      ok: true,
+      executionId,
+    },
   };
 };

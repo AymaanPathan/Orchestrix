@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   useNodesState,
   useEdgesState,
@@ -215,6 +215,9 @@ export default function WorkflowPage() {
   const saveWorkflow = async () => {
     try {
       validateGraph(nodes, edges, dbSchemas);
+      console.log("✅ Workflow valid, opening save modal");
+      console.log("🧾 Nodes:", nodes);
+      console.log("🧾 Edges:", edges);
     } catch (err: any) {
       return alert("Cannot save workflow: " + err.message);
     }

@@ -18,14 +18,15 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
   await connectMongo();
 
   const { step, steps, index, vars, executionId } = payload as any;
+  const nodeNumber = index; // ✅ SINGLE SOURCE OF TRUTH
 
   // ✅ Validate collection
   const Model = mongoose.models[step.collection];
   if (!Model) {
-    throw new Error(`Model not found: ${step.collection}`);
+    throw new Error(`Model not found at node ${nodeNumber}`);
   }
 
-  // ✅ FIX 1: resolve filters (VERY IMPORTANT)
+  // ✅ Resolve filters using vars
   const resolvedFilters = resolveObject(vars, step.filters || {});
 
   // ✅ Run query
@@ -34,39 +35,37 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
       ? await Model.findOne(resolvedFilters)
       : await Model.find(resolvedFilters);
 
-  console.log("🟢 DB FIND RESULT:", JSON.stringify(result, null, 2));
-
-  // ✅ FIX 2: normalize output variable
+  // ✅ Normalize output variable
   const outputVar = step.outputVar || step.output;
   if (!outputVar) {
-    throw new Error(`Missing outputVar for step ${step.id}`);
+    throw new Error(`Missing output variable at node ${nodeNumber}`);
   }
 
-  // ✅ FIX 3: create next vars snapshot
+  // ✅ Create next vars snapshot
   const nextVars = {
     ...vars,
     [outputVar]: result,
   };
 
-  // 🔹 Optional trace (keep for now)
+  // 🔍 TRACE (node-based, not id-based)
   await ctx.emit({
     topic: "workflow.trace",
     data: {
       executionId,
-      stepId: step.id,
+      nodeNumber, // ✅ FIXED
       stepType: "dbFind",
-      index,
       output: result,
       varsSnapshot: nextVars,
     },
   });
 
-  ctx.logger.info("📦 dbFind result", {
+  ctx.logger.info("📦 dbFind executed", {
     executionId,
+    nodeNumber,
     collection: step.collection,
   });
 
-  // ✅ FIX 4: pass correct vars forward
+  // ▶ Continue workflow
   await ctx.emit({
     topic: "workflow.run",
     data: {

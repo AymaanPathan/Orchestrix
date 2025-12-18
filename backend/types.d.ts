@@ -12,22 +12,18 @@ declare module 'motia' {
   }
 
   interface Handlers {
-    'workflow.log.persist': EventHandler<never, never>
-    'workflow.finished': EventHandler<never, { topic: 'workflow.log.persist'; data: never }>
-    'getWorkflowTrace': ApiRouteHandler<Record<string, unknown>, unknown, never>
-    'workflow.trace': EventHandler<never, never>
     'workflow.start': EventHandler<never, { topic: 'workflow.run'; data: never }>
-    'workflow.run': EventHandler<never, { topic: 'workflow.trace'; data: never } | { topic: 'dbFind'; data: never } | { topic: 'dbInsert'; data: never } | { topic: 'input'; data: never }>
+    'workflow.run': EventHandler<never, { topic: 'workflow.run'; data: never } | { topic: 'dbInsert'; data: never }>
     'workflowLogs': ApiRouteHandler<Record<string, unknown>, unknown, never>
     'saveWorkflow': ApiRouteHandler<Record<string, unknown>, unknown, never>
-    'runWorkflowPublic': ApiRouteHandler<Record<string, unknown>, unknown, never>
+    'runWorkflow': ApiRouteHandler<Record<string, unknown>, unknown, { topic: 'workflow.run'; data: never }>
     'models.bootstrap': EventHandler<never, { topic: 'workflow.run'; data: never }>
-    'input': EventHandler<never, { topic: 'workflow.run'; data: never } | { topic: 'workflow.trace'; data: never }>
+    'input': EventHandler<never, { topic: 'workflow.run'; data: never }>
     'executeWorkflow': ApiRouteHandler<Record<string, unknown>, unknown, { topic: 'workflow.start'; data: never }>
     'delay': EventHandler<never, never>
     'dbUpdate': EventHandler<never, { topic: 'workflow.run'; data: never }>
-    'dbInsert': EventHandler<never, { topic: 'workflow.run'; data: never } | { topic: 'workflow.trace'; data: never }>
-    'dbFind': EventHandler<never, { topic: 'workflow.run'; data: never } | { topic: 'workflow.trace'; data: never }>
+    'dbInsert': EventHandler<never, { topic: 'workflow.run'; data: never }>
+    'dbFind': EventHandler<never, { topic: 'workflow.run'; data: never }>
     'authMiddleware': EventHandler<never, { topic: 'workflow.run'; data: never }>
     'ProcessGreeting': EventHandler<{ timestamp: string; appName: string; greetingPrefix: string; requestId: string }, never>
     'HelloAPI': ApiRouteHandler<Record<string, unknown>, ApiResponse<200, { message: string; status: string; appName: string }>, { topic: 'process-greeting'; data: { timestamp: string; appName: string; greetingPrefix: string; requestId: string } }>
