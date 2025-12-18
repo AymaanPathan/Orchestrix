@@ -58,7 +58,9 @@ export function buildForExecute(nodes: any[], edges: any[]) {
           ...r,
           field:
             typeof r.field === "string"
-              ? transformTemplates(r.field, inputVars)
+              ? r.field.replace(/^{{\s*|\s*}}$/g, "").startsWith("input.")
+                ? r.field.replace(/^{{\s*|\s*}}$/g, "")
+                : `input.${r.field.replace(/^{{\s*|\s*}}$/g, "")}`
               : r.field,
         })),
         output: raw.outputVar || "validated",

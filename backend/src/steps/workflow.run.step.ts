@@ -21,6 +21,7 @@ export const config: EventConfig = {
     "delay",
     "authMiddleware",
     "emailSend",
+    "inputValidation",
   ],
 };
 
