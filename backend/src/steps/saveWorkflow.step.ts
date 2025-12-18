@@ -1,6 +1,6 @@
 import { ApiRouteConfig, StepHandler } from "motia";
-import Workflow from "../models/workflow.model";
-import PublishedApi from "../models/publishedApi.model";
+import Workflow from "../models/workflow.model.js";
+import PublishedApi from "../models/publishedApi.model.js";
 import { connectMongo } from "../lib/mongo";
 
 export const config: ApiRouteConfig = {
@@ -15,7 +15,7 @@ export const handler: StepHandler<typeof config> = async (req, ctx) => {
   await connectMongo();
   const { logger } = ctx;
 
-  const { workflowId, ownerId, steps, apiName } = req.body;
+  const { workflowId, ownerId, steps, apiName, inputVariables } = req.body;
 
   if (!workflowId || !ownerId || !Array.isArray(steps) || !apiName) {
     return {
@@ -37,7 +37,10 @@ export const handler: StepHandler<typeof config> = async (req, ctx) => {
   // 1️⃣ Save workflow
   const workflow = await Workflow.findOneAndUpdate(
     { workflowId, ownerId },
-    { steps },
+    {
+      steps,
+      inputVariables: inputVariables || [], // Store input variables
+    },
     { upsert: true, new: true }
   );
 
@@ -53,18 +56,21 @@ export const handler: StepHandler<typeof config> = async (req, ctx) => {
       name: apiName,
       slug,
       method: "POST",
+      inputVariables: inputVariables || [], // Store for API documentation
     },
     { upsert: true, new: true }
   );
 
-  logger.info("✅ Workflow saved & API published", { path });
+  logger.info("✅ Workflow saved & API published", { path, inputVariables });
 
   return {
     status: 200,
     body: {
       ok: true,
       workflowId,
-      api: { path, name: apiName },
+      apiPath: path,
+      apiName,
+      inputVariables: inputVariables || [],
     },
   };
 };

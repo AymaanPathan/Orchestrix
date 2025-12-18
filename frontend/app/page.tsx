@@ -73,6 +73,7 @@ export default function WorkflowPage() {
     apiName: string;
   } | null>(null);
 
+  console.log("Rerendering WorkflowPage", savedWorkflowData);
   // STEP NUMBERS
   const stepNumbers = calcStepNumbers(nodes, edges);
 
@@ -239,21 +240,59 @@ export default function WorkflowPage() {
     setSavedWorkflowData(null);
     setSaveModalOpen(true);
   };
+  function extractInputVariables(
+    nodes: any[]
+  ): Array<{ name: string; type?: string; default?: any }> {
+    const inputNode = nodes.find((n) => n.type === "input");
+
+    if (!inputNode?.data?.fields?.variables) {
+      return [];
+    }
+
+    return inputNode.data.fields.variables.map((v: any) => ({
+      name: v.name,
+      type: v.type || "string",
+      default: v.default,
+    }));
+  }
 
   // ACTUAL SAVE - Called from modal with apiName
   const handleSaveWithApiName = async (apiName: string) => {
-    const payload = buildForSave(nodes, edges);
+    setIsSaving(true);
 
-    const res = await fetch("http://localhost:3000/workflows/save", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...payload, apiName }),
-    });
+    try {
+      const payload = buildForSave(nodes, edges);
+      const inputVariables = extractInputVariables(nodes);
 
-    const result = await res.json();
-    if (!result.ok) throw new Error("Save failed");
+      const res = await fetch("http://localhost:3000/workflows/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...payload,
+          apiName,
+          inputVariables, // Include input variables
+        }),
+      });
+
+      const result = await res.json();
+      console.log("💾 Workflow saved:", result);
+
+      if (!result.ok) throw new Error("Save failed");
+
+      // Set saved data to show success screen
+      setSavedWorkflowData({
+        workflowId: result.workflowId,
+        apiPath: result.apiPath,
+        apiName: result.apiName,
+        inputVariables: result.inputVariables,
+      });
+    } catch (error) {
+      console.error("Save error:", error);
+      alert("Failed to save workflow");
+    } finally {
+      setIsSaving(false);
+    }
   };
-
   const executionId = execution?.executionId ?? null;
 
   const { data: streamLogs } = useStreamGroup<ExecutionLog>({
