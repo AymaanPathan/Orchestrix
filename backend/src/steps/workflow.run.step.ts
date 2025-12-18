@@ -12,6 +12,7 @@ export const config: EventConfig = {
     "dbUpdate",
     "delay",
     "authMiddleware",
+    "emailSend",
   ],
 };
 

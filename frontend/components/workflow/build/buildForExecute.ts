@@ -71,10 +71,14 @@ export function buildForExecute(nodes: any[], edges: any[]) {
     // EMAIL SEND
     // --------------------------------------------------
     if (node.type === "emailSend") {
+      const to =
+        raw.to && raw.to.trim()
+          ? transformTemplates(raw.to, inputVars)
+          : "input.email"; // 👈 fallback
       steps.push({
         id: stepId,
         type: "emailSend",
-        to: transformTemplates(raw.to, inputVars),
+        to: to,
         subject: transformTemplates(raw.subject, inputVars),
         body: transformTemplates(raw.body, inputVars),
         output: raw.outputVar || "emailResult",

@@ -18,13 +18,28 @@ export function resolveValue(vars: Record<string, any>, value: any): any {
   return value;
 }
 
-export function resolveObject(
-  vars: Record<string, any>,
-  obj: Record<string, any>
-) {
-  const out: any = {};
-  for (const k in obj) {
-    out[k] = resolveValue(vars, obj[k]);
+export function resolveObject(vars: any, value: any): any {
+  // ✅ STRING → resolve variable path
+  if (typeof value === "string") {
+    if (value.startsWith("input.") || value.includes(".")) {
+      return value.split(".").reduce((acc, key) => acc?.[key], vars);
+    }
+    return value;
   }
-  return out;
+
+  // ✅ ARRAY
+  if (Array.isArray(value)) {
+    return value.map((v) => resolveObject(vars, v));
+  }
+
+  // ✅ OBJECT (but NOT string)
+  if (value && typeof value === "object") {
+    const out: any = {};
+    for (const k in value) {
+      out[k] = resolveObject(vars, value[k]);
+    }
+    return out;
+  }
+
+  return value;
 }

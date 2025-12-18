@@ -13,11 +13,12 @@ declare module 'motia' {
 
   interface Handlers {
     'workflow.start': EventHandler<never, { topic: 'workflow.run'; data: never }>
-    'workflow.run': EventHandler<never, { topic: 'input'; data: never } | { topic: 'dbFind'; data: never } | { topic: 'dbInsert'; data: never } | { topic: 'dbUpdate'; data: never } | { topic: 'delay'; data: never } | { topic: 'authMiddleware'; data: never }>
+    'workflow.run': EventHandler<never, { topic: 'input'; data: never } | { topic: 'dbFind'; data: never } | { topic: 'dbInsert'; data: never } | { topic: 'dbUpdate'; data: never } | { topic: 'delay'; data: never } | { topic: 'authMiddleware'; data: never } | { topic: 'emailSend'; data: never }>
     'saveWorkflow': ApiRouteHandler<Record<string, unknown>, unknown, never>
     'runWorkflow': ApiRouteHandler<Record<string, unknown>, unknown, { topic: 'workflow.run'; data: never }>
     'input': EventHandler<never, { topic: 'workflow.run'; data: never }>
     'executeWorkflow': ApiRouteHandler<Record<string, unknown>, unknown, { topic: 'workflow.start'; data: never }>
+    'emailSend': EventHandler<never, { topic: 'workflow.run'; data: never }>
     'delay': EventHandler<never, never>
     'dbUpdate': EventHandler<never, { topic: 'workflow.run'; data: never }>
     'dbInsert': EventHandler<never, { topic: 'workflow.run'; data: never }>
