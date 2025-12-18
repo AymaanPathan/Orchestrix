@@ -17,6 +17,7 @@ declare module 'motia' {
     'saveWorkflow': ApiRouteHandler<Record<string, unknown>, unknown, never>
     'runWorkflow': ApiRouteHandler<Record<string, unknown>, unknown, { topic: 'workflow.run'; data: never }>
     'input': EventHandler<never, { topic: 'workflow.run'; data: never }>
+    'generateWorkflow': ApiRouteHandler<Record<string, unknown>, unknown, never>
     'executeWorkflow': ApiRouteHandler<Record<string, unknown>, unknown, { topic: 'workflow.start'; data: never }>
     'emailSend': EventHandler<never, { topic: 'workflow.run'; data: never }>
     'delay': EventHandler<never, never>

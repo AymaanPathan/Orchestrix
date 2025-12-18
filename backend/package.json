@@ -14,6 +14,7 @@
     "motia"
   ],
   "dependencies": {
+    "@huggingface/inference": "^4.13.5",
     "@motiadev/adapter-bullmq-events": "^0.17.6-beta.187",
     "@motiadev/core": "^0.17.6-beta.187",
     "@motiadev/plugin-bullmq": "^0.17.6-beta.187",
@@ -22,10 +23,12 @@
     "@motiadev/plugin-observability": "^0.17.6-beta.187",
     "@motiadev/plugin-states": "^0.17.6-beta.187",
     "bcryptjs": "^3.0.3",
+    "groq-sdk": "^0.37.0",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.0.1",
     "motia": "^0.17.6-beta.187",
     "nodemailer": "^7.0.11",
+    "openai": "^6.14.0",
     "zod": "^4.1.12"
   },
   "devDependencies": {
