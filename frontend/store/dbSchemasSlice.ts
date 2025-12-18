@@ -9,8 +9,8 @@ interface DbSchemaState {
 const initialState: DbSchemaState = {
   schemas: {
     // Example:
-    users: ["id", "name", "email"],
-    orders: ["orderId", "userId", "amount"],
+    users: ["name", "email"],
+    orders: ["userId", "amount"],
   },
   loading: false,
   error: null,

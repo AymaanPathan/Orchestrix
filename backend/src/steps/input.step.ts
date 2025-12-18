@@ -4,7 +4,7 @@ export const config: EventConfig = {
   name: "input",
   type: "event",
   subscribes: ["input"],
-  emits: ["workflow.run", "workflow.trace"],
+  emits: ["workflow.run"],
 };
 
 export const handler: StepHandler<typeof config> = async (payload, ctx) => {

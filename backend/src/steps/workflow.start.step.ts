@@ -4,10 +4,13 @@ export const config: EventConfig = {
   name: "workflow.start",
   type: "event",
   subscribes: ["workflow.start"],
-  emits: ["workflow.run"], // 👈 ONLY THIS
+  emits: ["workflow.run"],
 };
 
-export const handler: StepHandler<typeof config> = async (payload:any, ctx) => {
+export const handler: StepHandler<typeof config> = async (
+  payload: any,
+  ctx
+) => {
   console.log("🚀 workflow.start", payload.executionId);
 
   // JUST START EXECUTION
