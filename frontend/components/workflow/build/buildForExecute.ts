@@ -71,20 +71,21 @@ export function buildForExecute(nodes: any[], edges: any[]) {
     // EMAIL SEND
     // --------------------------------------------------
     if (node.type === "emailSend") {
-      const to =
-        raw.to && raw.to.trim()
-          ? transformTemplates(raw.to, inputVars)
-          : "input.email";
+      if (!raw.to || !raw.subject || !raw.body) {
+        console.warn("Skipping emailSend step due to missing fields");
+        continue;
+      }
 
       steps.push({
         id: stepId,
         type: "emailSend",
-        to,
-        subject: transformTemplates(raw.subject, inputVars),
-        body: transformTemplates(raw.body, inputVars),
+        to: transformed.to,
+        subject: transformed.subject,
+        body: transformed.body,
         output: raw.outputVar || "emailResult",
         pass: node.data?.pass,
       });
+
       continue;
     }
 
@@ -98,7 +99,7 @@ export function buildForExecute(nodes: any[], edges: any[]) {
         id: stepId,
         type: "dbInsert",
         collection,
-        data: rest, 
+        data: rest,
         output: output || "created",
         pass: node.data?.pass,
       });
@@ -130,23 +131,14 @@ export function buildForExecute(nodes: any[], edges: any[]) {
         id: stepId,
         type: "dbFind",
         collection: transformed.collection,
-        filter: transformed.filter || {},
-        findType: transformed.findType || "one",
-        output: transformed.output || "found",
+        filters: transformed.filters || {},
+        findType: transformed.findType || "findOne",
+        output: raw.outputVar || "foundData",
         pass: node.data?.pass,
       });
-      continue;
-    }
 
-    // --------------------------------------------------
-    // FALLBACK (CUSTOM STEPS)
-    // --------------------------------------------------
-    steps.push({
-      id: stepId,
-      type: node.type,
-      ...transformed,
-      pass: node.data?.pass,
-    });
+      continue; // 🚨 REQUIRED
+    }
   }
 
   console.log("🧠 STEPS SENT TO ENGINE:", steps);
@@ -234,7 +226,7 @@ function topologicalSort(nodes: any[], edges: any[]) {
 
 function transformTemplates(obj: any, inputVars: string[]): any {
   if (Array.isArray(obj)) {
-    return obj.map((item) => transformTemplates(item, inputVars));
+    return obj.map((v) => transformTemplates(v, inputVars));
   }
 
   if (obj && typeof obj === "object") {
@@ -246,17 +238,18 @@ function transformTemplates(obj: any, inputVars: string[]): any {
   }
 
   if (typeof obj === "string") {
-    const match = obj.match(/^{{\s*(.*?)\s*}}$/);
-    if (match) {
-      const varPath = match[1].trim();
-      const rootVar = varPath.split(".")[0];
+    // ⚠️ ONLY transform FULL {{var}} expressions
+    const full = obj.match(/^{{\s*([^}]+)\s*}}$/);
+    if (!full) return obj;
 
-      if (inputVars.includes(rootVar)) {
-        return `input.${varPath}`;
-      }
+    const varPath = full[1].trim();
+    const root = varPath.split(".")[0];
 
-      return varPath;
+    if (inputVars.includes(root)) {
+      return `input.${varPath}`;
     }
+
+    return varPath;
   }
 
   return obj;

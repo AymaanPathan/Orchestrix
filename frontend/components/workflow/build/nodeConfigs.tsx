@@ -46,10 +46,18 @@ const ValueSelector = ({ value, type, onChange }: any) => {
   CLEAN LABELED VAR LIST
 --------------------------------------------------- */
 const getLabeledVars = (availableVars: any[]) => {
-  return availableVars.map((item: any) => ({
-    value: item.var,
-    label: item.display,
-  }));
+  const seen = new Set<string>();
+
+  return availableVars
+    .filter((item: any) => {
+      if (seen.has(item.var)) return false;
+      seen.add(item.var);
+      return true;
+    })
+    .map((item: any) => ({
+      value: item.var,
+      label: item.display,
+    }));
 };
 
 /* ---------------------------------------------------
@@ -121,8 +129,8 @@ const FiltersBlock = ({
                 >
                   <option value="">Select variable…</option>
 
-                  {labeledVars.map((opt: any) => (
-                    <option key={opt.value} value={opt.value}>
+                  {labeledVars.map((opt: any, i: number) => (
+                    <option key={`${opt.value}-${i}`} value={opt.value}>
                       {opt.label}
                     </option>
                   ))}
@@ -215,8 +223,8 @@ const UpdateBlock = ({
                 >
                   <option value="">Select variable…</option>
 
-                  {labeledVars.map((opt: any) => (
-                    <option key={opt.value} value={opt.value}>
+                  {labeledVars.map((opt: any, i: number) => (
+                    <option key={`${opt.value}-${i}`} value={opt.value}>
                       {opt.label}
                     </option>
                   ))}

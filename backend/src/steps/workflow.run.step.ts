@@ -1,6 +1,14 @@
 // src/steps/workflow.run.step.ts
 import { EventConfig, StepHandler } from "motia";
 
+function assertNoUndefined(step: any, stepType: string) {
+  for (const [key, value] of Object.entries(step)) {
+    if (value === undefined) {
+      throw new Error(`${stepType} step misconfigured: "${key}" is undefined`);
+    }
+  }
+}
+
 export const config: EventConfig = {
   name: "workflow.run",
   type: "event",
@@ -60,7 +68,18 @@ export const handler: StepHandler<typeof config> = async (
     console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     return;
   }
-  // 🔁 Dispatch to actual step handler
+
+  if (["emailSend", "dbInsert", "dbUpdate"].includes(step.type)) {
+    assertNoUndefined(step, step.type);
+  }
+
+  if (step.type === "emailSend") {
+    if (!step.to || !step.subject || !step.body) {
+      throw new Error(
+        `emailSend step misconfigured at index ${index} (to=${!!step.to}, subject=${!!step.subject}, body=${!!step.body})`
+      );
+    }
+  }
   await ctx.emit({
     topic: step.type,
     data: {

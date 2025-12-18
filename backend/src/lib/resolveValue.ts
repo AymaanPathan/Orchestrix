@@ -1,12 +1,9 @@
 export function resolveValue(vars: Record<string, any>, value: any): any {
   if (typeof value !== "string") return value;
 
-  // input.name
-  if (value in vars) return vars[value];
+  const [root, ...path] = value.split(".");
 
-  // foundData.name
-  if (value.includes(".")) {
-    const [root, ...path] = value.split(".");
+  if (root in vars && path.length > 0) {
     let current = vars[root];
     for (const key of path) {
       if (current == null) return undefined;
@@ -19,20 +16,29 @@ export function resolveValue(vars: Record<string, any>, value: any): any {
 }
 
 export function resolveObject(vars: any, value: any): any {
-  // ✅ STRING → resolve variable path
+  // STRING
   if (typeof value === "string") {
-    if (value.startsWith("input.") || value.includes(".")) {
-      return value.split(".").reduce((acc, key) => acc?.[key], vars);
+    // Only resolve if first segment exists in vars
+    const [root, ...path] = value.split(".");
+
+    if (root in vars && path.length > 0) {
+      let current = vars[root];
+      for (const key of path) {
+        if (current == null) return undefined;
+        current = current[key];
+      }
+      return current;
     }
-    return value;
+
+    return value; // literal string
   }
 
-  // ✅ ARRAY
+  // ARRAY
   if (Array.isArray(value)) {
     return value.map((v) => resolveObject(vars, v));
   }
 
-  // ✅ OBJECT (but NOT string)
+  // OBJECT
   if (value && typeof value === "object") {
     const out: any = {};
     for (const k in value) {
