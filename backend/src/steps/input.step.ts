@@ -7,32 +7,25 @@ export const config: EventConfig = {
   emits: ["workflow.run"],
 };
 
-export const handler: StepHandler<typeof config> = async (payload, ctx) => {
-  const { step, steps, index, vars, executionId } = payload as any;
+export const handler: StepHandler<typeof config> = async (
+  payload: any,
+  ctx
+) => {
+  const { data, vars, steps, index, executionId } = payload;
 
-  const assigned: any = {};
-
-  for (const v of step.variables || []) {
-    assigned[v.name] = vars[v.name] ?? v.default ?? "";
+  // 🔐 SAFETY CHECK
+  const variables = data?.variables;
+  if (!Array.isArray(variables)) {
+    throw new Error("Input step requires data.variables[]");
   }
 
-  const nextVars = {
-    ...vars,
-    ...assigned,
-  };
+  const nextVars = { ...vars };
 
-  await ctx.emit({
-    topic: "workflow.trace",
-    data: {
-      executionId,
-      stepType: "input",
-      index,
-      output: assigned,
-      varsSnapshot: nextVars,
-    },
-  });
+  for (const v of variables) {
+    nextVars[v.name] = vars.input?.[v.name] ?? v.default ?? null;
+  }
 
-  // ▶ ADVANCE WORKFLOW HERE (ONLY HERE)
+  // 🔁 Continue workflow
   await ctx.emit({
     topic: "workflow.run",
     data: {

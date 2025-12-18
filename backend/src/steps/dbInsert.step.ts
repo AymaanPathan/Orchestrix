@@ -1,7 +1,6 @@
 import "../models/user.model.js";
 import { EventConfig, StepHandler } from "motia";
 import mongoose from "mongoose";
-
 import { connectMongo } from "../lib/mongo";
 import { resolveObject } from "../lib/resolveValue";
 
@@ -12,16 +11,19 @@ export const config: EventConfig = {
   emits: ["workflow.run"],
 };
 
-export const handler: StepHandler<typeof config> = async (payload, ctx) => {
+export const handler: StepHandler<typeof config> = async (
+  payload: any,
+  ctx
+) => {
   await connectMongo();
 
-  const { step, steps, index, vars, executionId } = payload as any;
+  const { collection, data, output, steps, index, vars, executionId } = payload;
 
-  const Model = mongoose.connection.models[step.collection];
-  if (!Model) throw new Error("Model not registered");
+  const Model = mongoose.connection.models[collection];
+  if (!Model) throw new Error(`Model not registered: ${collection}`);
 
-  const data = resolveObject(vars, step.data || {});
-  const created = await Model.create(data);
+  const resolvedData = resolveObject(vars, data || {});
+  const created = await Model.create(resolvedData);
 
   console.log(`🟢 [${executionId}] DB INSERT`, created);
 
@@ -30,7 +32,10 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
     data: {
       steps,
       index: index + 1,
-      vars: { ...vars, [step.output || "created"]: created },
+      vars: {
+        ...vars,
+        [output || "created"]: created,
+      },
       executionId,
     },
   });

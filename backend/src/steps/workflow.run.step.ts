@@ -6,6 +6,7 @@ export const config: EventConfig = {
   type: "event",
   subscribes: ["workflow.run"],
   emits: [
+    "input", // ✅ ADD THIS
     "dbFind",
     "dbInsert",
     "dbUpdate",

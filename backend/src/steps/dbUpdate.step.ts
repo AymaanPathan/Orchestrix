@@ -4,7 +4,8 @@ import "../models/publishedApi.model.js";
 
 import { EventConfig, StepHandler } from "motia";
 import { connectMongo } from "../lib/mongo";
-import userModel from "../models/user.model";
+import mongoose from "mongoose";
+import { resolveObject } from "../lib/resolveValue";
 
 export const config: EventConfig = {
   name: "dbUpdate",
@@ -13,21 +14,51 @@ export const config: EventConfig = {
   emits: ["workflow.run"],
 };
 
-export const handler: StepHandler<typeof config> = async (payload, ctx) => {
+export const handler: StepHandler<typeof config> = async (
+  payload: any,
+  ctx
+) => {
   await connectMongo();
 
-  const { step, steps, index, vars, executionId } = payload as any;
+  const {
+    collection,
+    updateType = "updateOne",
+    filters,
+    update,
+    output,
+    steps,
+    index,
+    vars,
+    executionId,
+  } = payload;
 
-  const { collection, updateType, filters, update, output } = step;
+  if (!collection) {
+    throw new Error("dbUpdate requires collection");
+  }
 
-  let Model;
-  if (collection === "users") Model = userModel;
-  else throw new Error("Unknown collection");
+  const Model = mongoose.connection.models[collection];
+  if (!Model) {
+    throw new Error(`Model not registered: ${collection}`);
+  }
 
-  const result =
-    updateType === "updateOne"
-      ? await Model.findOneAndUpdate(filters, { $set: update }, { new: true })
-      : await Model.updateMany(filters, { $set: update });
+  // 🔁 Resolve template variables
+  const resolvedFilters = resolveObject(vars, filters || {});
+  const resolvedUpdate = resolveObject(vars, update || {});
+
+  let result;
+  if (updateType === "updateMany") {
+    result = await Model.updateMany(resolvedFilters, {
+      $set: resolvedUpdate,
+    });
+  } else {
+    result = await Model.findOneAndUpdate(
+      resolvedFilters,
+      { $set: resolvedUpdate },
+      { new: true }
+    );
+  }
+
+  console.log(`🟡 [${executionId}] DB UPDATE`, result);
 
   // 🔁 Continue workflow
   await ctx.emit({
@@ -37,7 +68,7 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
       index: index + 1,
       vars: {
         ...vars,
-        [output]: result,
+        [output || "updated"]: result,
       },
       executionId,
     },

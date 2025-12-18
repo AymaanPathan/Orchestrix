@@ -39,7 +39,9 @@ export function buildForExecute(nodes: any[], edges: any[]) {
       steps.push({
         id: stepId,
         type: "input",
-        variables: raw.variables || [],
+        data: {
+          variables: raw.variables || [],
+        },
         pass: node.data?.pass,
       });
       continue;

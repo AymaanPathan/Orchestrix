@@ -5,73 +5,61 @@ import "../models/publishedApi.model.js";
 import { EventConfig, StepHandler } from "motia";
 import mongoose from "mongoose";
 import { connectMongo } from "../lib/mongo";
-import { resolveObject } from "../lib/resolveValue.js";
+import { resolveObject } from "../lib/resolveValue";
 
 export const config: EventConfig = {
   name: "dbFind",
   type: "event",
   subscribes: ["dbFind"],
-  emits: ["workflow.run", "workflow.trace"],
+  emits: ["workflow.run"],
 };
 
-export const handler: StepHandler<typeof config> = async (payload, ctx) => {
+export const handler: StepHandler<typeof config> = async (
+  payload: any,
+  ctx
+) => {
   await connectMongo();
 
-  const { step, steps, index, vars, executionId } = payload as any;
-  const nodeNumber = index; // ✅ SINGLE SOURCE OF TRUTH
-
-  // ✅ Validate collection
-  const Model = mongoose.models[step.collection];
-  if (!Model) {
-    throw new Error(`Model not found at node ${nodeNumber}`);
-  }
-
-  // ✅ Resolve filters using vars
-  const resolvedFilters = resolveObject(vars, step.filters || {});
-
-  // ✅ Run query
-  const result =
-    step.findType === "findOne"
-      ? await Model.findOne(resolvedFilters)
-      : await Model.find(resolvedFilters);
-
-  // ✅ Normalize output variable
-  const outputVar = step.outputVar || step.output;
-  if (!outputVar) {
-    throw new Error(`Missing output variable at node ${nodeNumber}`);
-  }
-
-  // ✅ Create next vars snapshot
-  const nextVars = {
-    ...vars,
-    [outputVar]: result,
-  };
-
-  // 🔍 TRACE (node-based, not id-based)
-  await ctx.emit({
-    topic: "workflow.trace",
-    data: {
-      executionId,
-      nodeNumber, // ✅ FIXED
-      stepType: "dbFind",
-      output: result,
-      varsSnapshot: nextVars,
-    },
-  });
-
-  ctx.logger.info("📦 dbFind executed", {
+  const {
+    collection,
+    filters,
+    findType = "one", // optional
+    output,
+    steps,
+    index,
+    vars,
     executionId,
-    nodeNumber,
-    collection: step.collection,
-  });
+  } = payload;
 
-  // ▶ Continue workflow
+  if (!collection) {
+    throw new Error("dbFind requires collection");
+  }
+
+  const Model = mongoose.connection.models[collection];
+  if (!Model) {
+    throw new Error(`Model not registered: ${collection}`);
+  }
+
+  const resolvedFilters = resolveObject(vars, filters || {});
+
+  let result;
+  if (findType === "many") {
+    result = await Model.find(resolvedFilters);
+  } else {
+    result = await Model.findOne(resolvedFilters);
+  }
+
+  console.log(`🔍 [${executionId}] DB FIND`, result);
+
   await ctx.emit({
     topic: "workflow.run",
     data: {
       steps,
       index: index + 1,
-      vars: nextVars,
+      vars: {
+        ...vars,
+        [output || "found"]: result,
+      },
       executionId,
     },
   });
