@@ -57,10 +57,15 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
     if (!collection) {
       throw new Error("dbUpdate requires collection");
     }
+    const Model =
+      mongoose.connection.models[collection] ||
+      mongoose.connection.models[collection] ||
+      mongoose.connection.models[
+        collection?.charAt(0).toUpperCase() + collection?.slice(1)
+      ];
 
-    const Model = mongoose.connection.models[collection];
     if (!Model) {
-      throw new Error(`Model not registered: ${collection}`);
+      throw new Error(`Model not found: ${collection}`);
     }
 
     // ───────────────── RESOLVE FILTERS ─────────────────

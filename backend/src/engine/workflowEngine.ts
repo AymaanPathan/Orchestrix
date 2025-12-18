@@ -29,7 +29,9 @@ export async function runEngine(steps: any[], input: any, headers: any = {}) {
       // 1️⃣ INPUT
       // ------------------------------------------------
       if (step.type === "input") {
-        for (const v of step.variables || []) {
+        const variables = step.data?.variables || [];
+
+        for (const v of variables) {
           if (!(v.name in vars.input)) {
             vars.input[v.name] = v.default ?? "";
           }
@@ -60,16 +62,29 @@ export async function runEngine(steps: any[], input: any, headers: any = {}) {
       // 3️⃣ DB FIND
       // ------------------------------------------------
       if (step.type === "dbFind") {
-        const Model = mongoose.connection.models[step.collection];
-        if (!Model) throw new Error(`Model not found: ${step.collection}`);
+        const modelName =
+          step.model ||
+          step.collection?.charAt(0).toUpperCase() +
+            step.collection?.slice(1).replace(/s$/, "");
 
-        const filters = resolveObject(vars, step.filters);
+        const Model =
+          mongoose.connection.models[step.model] ||
+          mongoose.connection.models[step.collection] ||
+          mongoose.connection.models[
+            step.collection?.charAt(0).toUpperCase() + step.collection?.slice(1)
+          ];
+
+        if (!Model) {
+          throw new Error(`Model not found: ${step.model || step.collection}`);
+        }
+
+        const filters = resolveObject(vars, step.filters || {});
         const result =
           step.findType === "many"
             ? await Model.find(filters)
             : await Model.findOne(filters);
 
-        vars[step.output] = result;
+        vars[step.output || "found"] = result;
         logs.push({ step: index, result });
         continue;
       }
@@ -78,17 +93,25 @@ export async function runEngine(steps: any[], input: any, headers: any = {}) {
       // 4️⃣ DB INSERT
       // ------------------------------------------------
       if (step.type === "dbInsert") {
-        const Model = mongoose.connection.models[step.collection];
-        if (!Model) throw new Error(`Model not found: ${step.collection}`);
+        const modelName =
+          step.model ||
+          step.collection?.charAt(0).toUpperCase() +
+            step.collection?.slice(1).replace(/s$/, "");
 
-        const data = resolveObject(vars, step.data);
+        const Model = mongoose.connection.models[modelName];
+        if (!Model) throw new Error(`Model not found: ${modelName}`);
+
+        const rawData = step.data?.data || {};
+        const data = resolveObject(vars, rawData);
 
         if (data.password) {
           data.password = await bcrypt.hash(data.password, 10);
         }
 
         const created = await Model.create(data);
-        vars[step.output] = created;
+
+        const outputKey = step.output || step.data?.outputVar || "created";
+        vars[outputKey] = created;
 
         logs.push({ step: index, created });
         continue;
@@ -98,7 +121,16 @@ export async function runEngine(steps: any[], input: any, headers: any = {}) {
       // 5️⃣ DB UPDATE
       // ------------------------------------------------
       if (step.type === "dbUpdate") {
-        const Model = mongoose.connection.models[step.collection];
+        const Model =
+          mongoose.connection.models[step.model] ||
+          mongoose.connection.models[step.collection] ||
+          mongoose.connection.models[
+            step.collection?.charAt(0).toUpperCase() + step.collection?.slice(1)
+          ];
+
+        if (!Model) {
+          throw new Error(`Model not found: ${step.model || step.collection}`);
+        }
 
         const filter = resolveObject(vars, step.filter);
         const data = resolveObject(vars, step.data);

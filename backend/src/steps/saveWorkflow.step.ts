@@ -1,6 +1,7 @@
 import { ApiRouteConfig, StepHandler } from "motia";
 import Workflow from "../models/workflow.model";
 import PublishedApi from "../models/publishedApi.model";
+import { connectMongo } from "../lib/mongo";
 
 export const config: ApiRouteConfig = {
   name: "saveWorkflow",
@@ -11,7 +12,7 @@ export const config: ApiRouteConfig = {
 };
 
 export const handler: StepHandler<typeof config> = async (req, ctx) => {
-  // await connectMongo();
+  await connectMongo();
   const { logger } = ctx;
 
   const { workflowId, ownerId, steps, apiName } = req.body;

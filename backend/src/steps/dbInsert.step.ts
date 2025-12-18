@@ -40,13 +40,16 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
       title: "DB Insert started",
       timestamp: Date.now(),
     });
+    const Model =
+      mongoose.connection.models[collection] ||
+      mongoose.connection.models[collection] ||
+      mongoose.connection.models[
+        collection?.charAt(0).toUpperCase() + collection?.slice(1)
+      ];
 
-    // ───────────────── MODEL VALIDATION ─────────────────
-    const Model = mongoose.connection.models[collection];
     if (!Model) {
-      throw new Error(`Model not registered: ${collection}`);
+      throw new Error(`Model not found: ${collection}`);
     }
-
     // ───────────────── RESOLVE PAYLOAD ─────────────────
     const resolved = resolveObject(vars, data || {});
     logKV("Resolved payload", resolved);
