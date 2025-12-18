@@ -13,6 +13,7 @@ export const config: EventConfig = {
     "delay",
     "authMiddleware",
     "emailSend",
+    "workflow.log",
   ],
 };
 
@@ -22,11 +23,10 @@ export const handler: StepHandler<typeof config> = async (
 ) => {
   const { steps, index, vars, executionId } = payload;
 
- if (index >= steps.length) {
-   console.log("✅ Workflow finished:", executionId);
-   return;
- }
-
+  if (index >= steps.length) {
+    console.log("✅ Workflow finished:", executionId);
+    return;
+  }
 
   const step = steps[index];
 
@@ -36,6 +36,18 @@ export const handler: StepHandler<typeof config> = async (
     "execution:",
     executionId
   );
+
+  await ctx.emit({
+    topic: "workflow.log",
+    data: {
+      executionId,
+      level: "info",
+      message: `Executing step ${index}: ${step.type}`,
+      step: step.type,
+      index,
+      timestamp: Date.now(),
+    },
+  });
 
   // 🔁 Dispatch to actual step handler
   await ctx.emit({

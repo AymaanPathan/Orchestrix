@@ -30,7 +30,7 @@ interface LogEntry {
 interface ExecutionLogsSidebarProps {
   isOpen: boolean;
   onClose: () => void;
-  logs: LogEntry[];
+  logs: any[];
   isPolling: boolean;
   executionId: string | null;
 }

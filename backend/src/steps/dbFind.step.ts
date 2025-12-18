@@ -52,6 +52,18 @@ export const handler: StepHandler<typeof config> = async (
   console.log(`🔍 [${executionId}] DB FIND`, result);
 
   await ctx.emit({
+    topic: "workflow.log",
+    data: {
+      executionId,
+      level: "debug",
+      message: `DB FIND result`,
+      payload: result,
+      step: "dbFind",
+      timestamp: Date.now(),
+    },
+  });
+
+  await ctx.emit({
     topic: "workflow.run",
     data: {
       steps,

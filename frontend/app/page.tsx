@@ -35,7 +35,15 @@ import { validateGraph } from "@/components/workflow/validation/validateGraph";
 import { RootDispatch, RootState } from "@/store";
 import { useDispatch, useSelector } from "react-redux";
 import AnimatedDashedEdge from "@/components/Ui/AnimatedDashedEdge";
-
+import { socket } from "@/utils/socket";
+type ExecutionLog = {
+  executionId: string;
+  level: "info" | "debug" | "error";
+  message: string;
+  step?: string;
+  index?: number;
+  timestamp: number;
+};
 export default function WorkflowPage() {
   const [graphMeta, setGraphMeta] = useState<any>(null);
   const dbSchemas = useSelector((state: RootState) => state.dbSchemas.schemas);
@@ -45,11 +53,14 @@ export default function WorkflowPage() {
   const [selectedNode, setSelectedNode] = useState<any>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [rfInstance, setRfInstance] = useState<any>(null);
-  const [logs, setLogs] = useState<any>(null);
   const [logsOpen, setLogsOpen] = useState(false);
   const [aiPrompt, setAiPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
-
+  const [execution, setExecution] = useState<{
+    executionId: string;
+    logs: ExecutionLog[];
+    finished: boolean;
+  } | null>(null);
   // Modal state
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -111,7 +122,6 @@ export default function WorkflowPage() {
     );
   }, []);
 
-  // AUTO APPLY STEP NUMBERS
   useEffect(() => {
     const stepMap = computeStepMapping(nodes, edges);
 
@@ -265,7 +275,15 @@ export default function WorkflowPage() {
     }
   };
 
-  const executingRef = useRef(false);
+  useEffect(() => {
+    if (!socket.connected) {
+      socket.connect();
+    }
+    socket.on("connect", () => {
+      console.log("✅ socket connected", socket.id);
+    });
+  }, []);
+
   const runWorkflow = async () => {
     try {
       validateGraph(nodes, edges, dbSchemas);
@@ -275,33 +293,34 @@ export default function WorkflowPage() {
     }
 
     const payload = buildForExecute(nodes, edges);
-    if (executingRef.current) return;
-    executingRef.current = true;
+
     const res = await fetch("http://localhost:3000/workflow/execute", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    executingRef.current = false;
+
     const output = await res.json();
+    console.log("🚀 Execution started:", output);
+    if (!output.executionId) return;
 
-    if (!output.executionId) {
-      console.error("❌ Execution failed:", output);
-      return;
-    }
+    // ✅ init execution sidebar
+    setExecution({
+      executionId: output.executionId,
+      logs: [],
+      finished: false,
+    });
 
-    console.log("✅ Workflow execution triggered");
-    console.log("🆔 Execution ID:", output.executionId);
+    setLogsOpen(true);
 
-    alert("Workflow executed. Check backend console / DB.");
+    // 🔥 join execution room
+    socket.emit("join", output.executionId);
   };
-
   // NODE SAVE HANDLER
   const handleSaveNode = (id: string, newData: any) => {
     setNodes((curr) => saveNodeChanges(id, newData, curr));
   };
 
-  const isPolling = logs && !logs.finished && logs.executionId;
   const edgeTypes = {
     animated: AnimatedDashedEdge,
   };
@@ -477,9 +496,9 @@ export default function WorkflowPage() {
       <ExecutionLogsSidebar
         isOpen={logsOpen}
         onClose={() => setLogsOpen(false)}
-        logs={logs?.logs || []}
-        isPolling={isPolling}
-        executionId={logs?.executionId || null}
+        logs={execution?.logs || []}
+        isPolling={execution ? !execution.finished : false}
+        executionId={execution?.executionId || null}
       />
 
       {/* Save Workflow Modal */}

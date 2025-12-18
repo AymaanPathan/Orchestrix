@@ -4,7 +4,7 @@ export const config: EventConfig = {
   name: "input",
   type: "event",
   subscribes: ["input"],
-  emits: ["workflow.run"],
+  emits: ["workflow.run", "workflow.log"], // 🔥 ADD THIS
 };
 
 export const handler: StepHandler<typeof config> = async (
@@ -30,6 +30,20 @@ export const handler: StepHandler<typeof config> = async (
     nextVars.input[v.name] = vars.input?.[v.name] ?? v.default ?? null;
   }
 
+  // 🔥 EMIT LOG FOR FRONTEND
+  await ctx.emit({
+    topic: "workflow.log",
+    data: {
+      executionId,
+      level: "info",
+      message: "Input step resolved",
+      step: "input",
+      index,
+      timestamp: Date.now(),
+    },
+  });
+
+  // 🔁 CONTINUE WORKFLOW
   await ctx.emit({
     topic: "workflow.run",
     data: {
