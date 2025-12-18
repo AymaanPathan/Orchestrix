@@ -1,9 +1,7 @@
 import mongoose from "mongoose";
-
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { resolveObject } from "../lib/resolveValue";
-import { resolveTemplate } from "../flows/templateResolver";
 import { sendEmail } from "../lib/email";
 import { connectMongo } from "../lib/mongo";
 import { getModel } from "../lib/getModel";
@@ -153,14 +151,18 @@ export async function runEngine(steps: any[], input: any, headers: any = {}) {
       // 7️⃣ EMAIL SEND
       // ------------------------------------------------
       if (step.type === "emailSend") {
-        const to = resolveTemplate(step.to, vars);
-        const subject = resolveTemplate(step.subject, vars);
-        const body = resolveTemplate(step.body, vars);
+        // ✅ Use resolveObject to handle both {{var}} and dot notation
+        const to = resolveObject(vars, step.to);
+        const subject = resolveObject(vars, step.subject);
+        const body = resolveObject(vars, step.body);
 
         console.log("📧 Sending email (RESOLVED)", {
           to,
           subject,
           body,
+          originalTo: step.to,
+          originalSubject: step.subject,
+          originalBody: step.body,
         });
 
         const result = await sendEmail({ to, subject, body });
