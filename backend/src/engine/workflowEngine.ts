@@ -1,12 +1,14 @@
 import mongoose from "mongoose";
+
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { resolveObject } from "../lib/resolveValue";
 import { resolveTemplate } from "../flows/templateResolver";
 import { sendEmail } from "../lib/email";
+import { connectMongo } from "../lib/mongo";
 
 export async function runEngine(steps: any[], input: any, headers: any = {}) {
-  // 🔹 Canonical vars shape (IMPORTANT)
+  connectMongo();
   const vars: Record<string, any> = {
     input: { ...input },
   };

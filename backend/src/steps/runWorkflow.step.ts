@@ -1,8 +1,8 @@
 import { ApiRouteConfig, StepHandler } from "motia";
-import Workflow from "../models/workflow.model";
-import PublishedApi from "../models/publishedApi.model";
-import { connectMongo } from "../lib/mongo";
+import Workflow from "../models/workflow.model.js";
+import PublishedApi from "../models/publishedApi.model.js";
 import { runEngine } from "../engine/workflowEngine";
+import { connectMongo } from "../lib/mongo.js";
 
 export const config: ApiRouteConfig = {
   name: "runWorkflowPublic",
@@ -15,7 +15,10 @@ export const config: ApiRouteConfig = {
 export const handler: StepHandler<typeof config> = async (req, ctx) => {
   await connectMongo();
   const { logger } = ctx;
-
+  await ctx.emit({
+    topic: "models.register",
+    data: {},
+  });
   const { workflowId, apiName } = req.pathParams || {};
 
   if (!workflowId || !apiName) {
@@ -55,7 +58,6 @@ export const handler: StepHandler<typeof config> = async (req, ctx) => {
     input,
   });
 
-  // 🔥 SYNC HTTP EXECUTION
   const result = await runEngine(workflow.steps, input, req.headers);
 
   return {

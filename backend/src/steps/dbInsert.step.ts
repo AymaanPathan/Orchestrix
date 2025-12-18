@@ -1,4 +1,3 @@
-import "../models/user.model.js";
 import { EventConfig, StepHandler } from "motia";
 import mongoose from "mongoose";
 import { connectMongo } from "../lib/mongo";
