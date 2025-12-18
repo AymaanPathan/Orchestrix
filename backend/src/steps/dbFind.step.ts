@@ -8,6 +8,15 @@ import {
   logError,
 } from "../lib/consoleLogger";
 import { EventConfig, StepHandler } from "motia";
+import {
+  logStepStart as logStepStartStream,
+  logStepInfo,
+  logStepData,
+  logStepSuccess,
+  logStepError,
+  logExecutionFinished,
+  logExecutionFailed,
+} from "../lib/logStep";
 
 export const config: EventConfig = {
   name: "dbFind",
@@ -17,7 +26,7 @@ export const config: EventConfig = {
 };
 
 export const handler: StepHandler<typeof config> = async (payload, ctx) => {
-  const start = Date.now();
+  const startedAt = Date.now();
   const { streams } = ctx;
 
   const {
@@ -31,35 +40,75 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
     executionId,
   } = payload;
 
+  const totalSteps = steps?.length || 0;
+  const isLastStep = index >= totalSteps - 1;
+  const stepId = `dbfind-${index}`;
+
   try {
     await connectMongo();
 
+    // Console logs
     logStepStart(index, "dbFind");
     logKV("Collection", collection);
     logKV("Raw filters", filters);
     logKV("Vars", vars);
 
-    // ───────── STREAM: START ─────────
-    await streams.executionLog.set(executionId, `dbfind-start-${index}`, {
+    // ───────────────── STREAM: STEP STARTED ─────────────────
+    await logStepStartStream(streams, {
       executionId,
+      stepId,
       stepIndex: index,
       stepType: "dbFind",
-      phase: "start",
-      title: "DB Find started",
-      timestamp: Date.now(),
+      totalSteps,
+      message: `Querying "${collection}" collection`,
+      input: { collection, filters, findType },
+    });
+
+    // ───────────────── STREAM: CONNECTING ─────────────────
+    await logStepInfo(streams, {
+      executionId,
+      stepId,
+      stepIndex: index,
+      stepType: "dbFind",
+      title: "Connecting to database",
+      message: "Establishing MongoDB connection...",
+    });
+
+    // ───────────────── STREAM: RESOLVING FILTERS ─────────────────
+    await logStepInfo(streams, {
+      executionId,
+      stepId,
+      stepIndex: index,
+      stepType: "dbFind",
+      title: "Resolving query filters",
+      message: "Processing and resolving filter parameters...",
+      data: { rawFilters: filters },
     });
 
     const resolvedFilters = resolveObject(vars, filters);
     logKV("Resolved filters", resolvedFilters);
 
-    await streams.executionLog.set(executionId, `dbfind-resolved-${index}`, {
+    // ───────────────── STREAM: FILTERS RESOLVED ─────────────────
+    await logStepData(streams, {
       executionId,
+      stepId,
       stepIndex: index,
       stepType: "dbFind",
-      phase: "data",
-      title: "Resolved filters",
+      title: "Filters resolved successfully",
+      message: `Query will use ${
+        Object.keys(resolvedFilters || {}).length
+      } filter condition(s)`,
       data: resolvedFilters,
-      timestamp: Date.now(),
+    });
+
+    // ───────────────── STREAM: FINDING MODEL ─────────────────
+    await logStepInfo(streams, {
+      executionId,
+      stepId,
+      stepIndex: index,
+      stepType: "dbFind",
+      title: "Locating collection model",
+      message: `Looking for model: ${collection}`,
     });
 
     const Model =
@@ -73,6 +122,29 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
       throw new Error(`Model not found: ${collection}`);
     }
 
+    // ───────────────── STREAM: MODEL FOUND ─────────────────
+    await logStepInfo(streams, {
+      executionId,
+      stepId,
+      stepIndex: index,
+      stepType: "dbFind",
+      title: "Collection model found",
+      message: `Successfully located "${collection}" model`,
+    });
+
+    // ───────────────── STREAM: EXECUTING QUERY ─────────────────
+    await logStepInfo(streams, {
+      executionId,
+      stepId,
+      stepIndex: index,
+      stepType: "dbFind",
+      title: "Executing database query",
+      message: `Running ${
+        findType === "many" ? "find()" : "findOne()"
+      } query...`,
+      data: { findType, filters: resolvedFilters },
+    });
+
     const result =
       findType === "many"
         ? await Model.find(resolvedFilters)
@@ -80,27 +152,52 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
 
     logKV("Query result", result);
 
-    await streams.executionLog.set(executionId, `dbfind-result-${index}`, {
+    // ───────────────── STREAM: QUERY RESULT ─────────────────
+    const resultCount = Array.isArray(result) ? result.length : result ? 1 : 0;
+    await logStepData(streams, {
       executionId,
+      stepId,
       stepIndex: index,
       stepType: "dbFind",
-      phase: "data",
-      title: "Query result",
+      title: "Query executed successfully",
+      message: `Found ${resultCount} record${resultCount !== 1 ? "s" : ""}`,
       data: result,
-      timestamp: Date.now(),
+      metadata: {
+        recordCount: resultCount,
+        findType,
+        outputVariable: output,
+        collection,
+      },
     });
 
-    await streams.executionLog.set(executionId, `dbfind-end-${index}`, {
+    // ───────────────── STREAM: STEP FINISHED ─────────────────
+    await logStepSuccess(streams, {
       executionId,
+      stepId,
       stepIndex: index,
       stepType: "dbFind",
-      phase: "end",
-      title: "DB Find completed",
-      durationMs: Date.now() - start,
-      timestamp: Date.now(),
+      totalSteps,
+      message: `Database query completed successfully`,
+      output: result,
+      data: result,
+      metadata: {
+        recordCount: resultCount,
+        collection,
+        findType,
+      },
+      startedAt,
     });
 
-    logSuccess("dbFind", Date.now() - start);
+    logSuccess("dbFind", Date.now() - startedAt);
+
+    // ───────────────── STREAM: EXECUTION FINISHED (if last step) ─────────────────
+    if (isLastStep) {
+      await logExecutionFinished(streams, {
+        executionId,
+        totalSteps,
+        startedAt,
+      });
+    }
 
     await ctx.emit({
       topic: "workflow.run",
@@ -113,6 +210,31 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
     });
   } catch (err) {
     logError("dbFind", err);
+
+    // ───────────────── STREAM: STEP ERROR ─────────────────
+    await logStepError(streams, {
+      executionId,
+      stepId,
+      stepIndex: index,
+      stepType: "dbFind",
+      totalSteps,
+      error: String(err),
+      data: {
+        collection,
+        findType,
+        filters,
+      },
+      startedAt,
+    });
+
+    // ───────────────── STREAM: EXECUTION FAILED ─────────────────
+    await logExecutionFailed(streams, {
+      executionId,
+      failedStepIndex: index,
+      totalSteps,
+      error: String(err),
+    });
+
     throw err;
   }
 };
