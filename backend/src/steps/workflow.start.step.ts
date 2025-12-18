@@ -1,4 +1,5 @@
 import { EventConfig, StepHandler } from "motia";
+import { logSection } from "../lib/consoleLogger";
 
 export const config: EventConfig = {
   name: "workflow.start",
@@ -7,15 +8,15 @@ export const config: EventConfig = {
   emits: ["workflow.run"],
 };
 
-export const handler: StepHandler<typeof config> = async (
-  payload: any,
-  ctx
-) => {
-  console.log("🚀 workflow.start", payload.executionId);
+export const handler: StepHandler<typeof config> = async (payload, ctx) => {
+  const { executionId, steps } = payload;
 
-  // JUST START EXECUTION
+  logSection("🚀 WORKFLOW EXECUTION STARTED");
+  console.log("Execution ID:", executionId);
+  console.log("Total Steps:", steps.length);
+
   await ctx.emit({
     topic: "workflow.run",
-    data: payload,
+    data: { ...payload, index: 0 },
   });
 };

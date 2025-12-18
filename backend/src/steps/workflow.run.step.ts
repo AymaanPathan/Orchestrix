@@ -55,6 +55,11 @@ export const handler: StepHandler<typeof config> = async (
     timestamp: Date.now(),
   });
 
+  if (index >= steps.length) {
+    console.log("\n✅ WORKFLOW FINISHED SUCCESSFULLY");
+    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    return;
+  }
   // 🔁 Dispatch to actual step handler
   await ctx.emit({
     topic: step.type,

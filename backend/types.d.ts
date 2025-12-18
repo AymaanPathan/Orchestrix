@@ -8,7 +8,7 @@ import { EventHandler, ApiRouteHandler, ApiResponse, MotiaStream, CronHandler } 
 
 declare module 'motia' {
   interface FlowContextStateStreams {
-    'executionLog': MotiaStream<{ executionId: string; level: 'info' | 'debug' | 'error'; message: string; step?: string; index?: number; timestamp: number }>
+    'executionLog': MotiaStream<{ id: string; executionId: string; step: string; stepType: string; phase: 'start' | 'data' | 'result' | 'error' | 'end'; message: string; payload?: unknown; timestamp: number }>
   }
 
   interface Handlers {

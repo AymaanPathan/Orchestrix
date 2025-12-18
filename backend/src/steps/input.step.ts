@@ -1,55 +1,78 @@
 import { EventConfig, StepHandler } from "motia";
+import {
+  logStepStart,
+  logKV,
+  logSuccess,
+  logError,
+} from "../lib/consoleLogger";
 
 export const config: EventConfig = {
   name: "input",
   type: "event",
   subscribes: ["input"],
-  emits: ["workflow.run", "workflow.log"], // 🔥 ADD THIS
+  emits: ["workflow.run"],
 };
 
-export const handler: StepHandler<typeof config> = async (
-  payload: any,
-  ctx
-) => {
-  const { data, vars, steps, index, executionId } = payload;
+export const handler: StepHandler<typeof config> = async (payload, ctx) => {
+  const start = Date.now();
+  const { streams } = ctx;
 
-  const variables = data?.variables;
-  if (!Array.isArray(variables)) {
-    throw new Error("Input step requires data.variables[]");
-  }
+  const { data, vars = {}, steps, index, executionId } = payload;
 
-  // ✅ PRESERVE input namespace
-  const nextVars = {
-    ...vars,
-    input: {
-      ...(vars.input || {}),
-    },
-  };
-
-  for (const v of variables) {
-    nextVars.input[v.name] = vars.input?.[v.name] ?? v.default ?? null;
-  }
-
-  // 🔥 EMIT LOG FOR FRONTEND
-  await ctx.emit({
-    topic: "workflow.log",
-    data: {
-      executionId,
-      level: "info",
-      message: "Input step resolved",
-      step: "input",
-      index,
-      timestamp: Date.now(),
-    },
+  // ───────────────── START ─────────────────
+  await streams.executionLog.set(executionId, `input-start-${index}`, {
+    executionId,
+    stepIndex: index,
+    stepType: "input",
+    phase: "start",
+    title: "Input step started",
+    timestamp: Date.now(),
   });
 
-  // 🔁 CONTINUE WORKFLOW
+  // ───────────── RAW CONFIG ─────────────
+  await streams.executionLog.set(executionId, `input-raw-${index}`, {
+    executionId,
+    stepIndex: index,
+    stepType: "input",
+    phase: "data",
+    title: "Raw variables config",
+    data: data.variables,
+    timestamp: Date.now(),
+  });
+
+  // ─────────── RESOLVE INPUT ───────────
+  const resolvedInput: any = {};
+  for (const v of data.variables || []) {
+    resolvedInput[v.name] = vars.input?.[v.name] ?? v.default ?? null;
+  }
+
+  await streams.executionLog.set(executionId, `input-resolved-${index}`, {
+    executionId,
+    stepIndex: index,
+    stepType: "input",
+    phase: "data",
+    title: "Resolved input values",
+    data: resolvedInput,
+    timestamp: Date.now(),
+  });
+
+  // ───────────────── END ─────────────────
+  await streams.executionLog.set(executionId, `input-end-${index}`, {
+    executionId,
+    stepIndex: index,
+    stepType: "input",
+    phase: "end",
+    title: "Input completed",
+    durationMs: Date.now() - start,
+    timestamp: Date.now(),
+  });
+
   await ctx.emit({
     topic: "workflow.run",
     data: {
       steps,
       index: index + 1,
-      vars: nextVars,
+      vars: { ...vars, input: resolvedInput },
       executionId,
     },
   });

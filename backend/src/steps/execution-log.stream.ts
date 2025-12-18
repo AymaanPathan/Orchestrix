@@ -2,20 +2,18 @@ import { StreamConfig } from "motia";
 import { z } from "zod";
 
 export const executionLogSchema = z.object({
+  id: z.string(),
   executionId: z.string(),
-  level: z.enum(["info", "debug", "error"]),
+  step: z.string(),
+  stepType: z.string(),
+  phase: z.enum(["start", "data", "result", "error", "end"]),
   message: z.string(),
-  step: z.string().optional(),
-  index: z.number().optional(),
+  payload: z.any().optional(),
   timestamp: z.number(),
 });
 
 export const config: StreamConfig = {
   name: "executionLog",
   schema: executionLogSchema,
-  baseConfig: {
-    storageType: "default", // file adapter is fine
-  },
+  baseConfig: { storageType: "default" },
 };
-
-export type ExecutionLog = z.infer<typeof executionLogSchema>;

@@ -38,12 +38,15 @@ import AnimatedDashedEdge from "@/components/Ui/AnimatedDashedEdge";
 import { useStreamGroup } from "@motiadev/stream-client-react";
 type ExecutionLog = {
   executionId: string;
-  level: "info" | "debug" | "error";
-  message: string;
-  step?: string;
-  index?: number;
+  stepIndex: number;
+  stepType: string;
+  phase: "start" | "data" | "end" | "error";
+  title: string;
+  data?: any;
+  durationMs?: number;
   timestamp: number;
 };
+
 export default function WorkflowPage() {
   const [graphMeta, setGraphMeta] = useState<any>(null);
   const dbSchemas = useSelector((state: RootState) => state.dbSchemas.schemas);
@@ -276,10 +279,11 @@ export default function WorkflowPage() {
   };
   const executionId = execution?.executionId ?? null;
 
-  const { data: streamLogs } = useStreamGroup({
+  const { data: streamLogs } = useStreamGroup<ExecutionLog>({
     streamName: "executionLog",
-    groupId: executionId ?? undefined, // 🔑 important
+    groupId: executionId ?? undefined,
   });
+
   useEffect(() => {
     if (!executionId) return;
 
@@ -290,9 +294,7 @@ export default function WorkflowPage() {
         ...prev,
         logs: streamLogs,
         finished: streamLogs.some(
-          (l) =>
-            l.level === "info" &&
-            l.message.toLowerCase().includes("workflow finished")
+          (l) => l.phase === "end" && l.title.toLowerCase().includes("workflow")
         ),
       };
     });
