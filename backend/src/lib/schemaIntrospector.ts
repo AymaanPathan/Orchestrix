@@ -4,19 +4,20 @@ function extractFromMongoose(schema: mongoose.Schema) {
   const fields: Record<string, string> = {};
 
   schema.eachPath((path, type) => {
+    // 🚫 Mongo / Mongoose forbidden keys
     if (
       path === "_id" ||
       path === "__v" ||
-      path.startsWith("__") ||
       path === "createdAt" ||
-      path === "updatedAt"
-    )
+      path === "updatedAt" ||
+      path.startsWith("$") ||
+      path.includes(".")
+    ) {
       return;
+    }
 
     fields[path] = type.instance;
   });
-
-  delete fields.__v; // 🛡 absolute safeguard
 
   return fields;
 }
@@ -36,7 +37,6 @@ function extractFromDocuments(docs: any[]) {
 
   return fields;
 }
-
 export async function introspectDatabase() {
   const db = mongoose.connection.db;
   if (!db) throw new Error("DB not connected");
@@ -47,14 +47,17 @@ export async function introspectDatabase() {
   for (const col of collections) {
     const name = col.name;
 
-    // 1️⃣ If mongoose model exists → best source
-    const model = mongoose.models[name];
+    // 1️⃣ Prefer mongoose schema ALWAYS (even if empty)
+    const model = Object.values(mongoose.models).find(
+      (m: any) => m.collection?.name === name
+    );
+
     if (model?.schema) {
       schemas[name] = extractFromMongoose(model.schema);
       continue;
     }
 
-    // 2️⃣ Fallback → sample documents
+    // 2️⃣ Only fallback if NO schema exists at all
     const docs = await db.collection(name).find({}).limit(20).toArray();
     schemas[name] = extractFromDocuments(docs);
   }
