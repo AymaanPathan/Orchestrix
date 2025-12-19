@@ -18,6 +18,7 @@ declare module 'motia' {
     'runWorkflowPublic': ApiRouteHandler<Record<string, unknown>, unknown, never>
     'inputValidation': EventHandler<never, { topic: 'workflow.run'; data: never }>
     'input': EventHandler<never, { topic: 'workflow.run'; data: never }>
+    'getDbSchemas': ApiRouteHandler<Record<string, unknown>, unknown, never>
     'generateWorkflow': ApiRouteHandler<Record<string, unknown>, unknown, never>
     'ExecutionLogs': ApiRouteHandler<Record<string, unknown>, unknown, never>
     'executeWorkflow': ApiRouteHandler<Record<string, unknown>, unknown, { topic: 'workflow.start'; data: never }>

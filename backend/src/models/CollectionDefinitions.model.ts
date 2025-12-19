@@ -1,23 +1,19 @@
-import mongoose from "mongoose";
+import mongoose, { Schema } from "mongoose";
 
-const FieldSchema = new mongoose.Schema(
-  {
-    name: { type: String, required: true },
-    type: { type: String, required: true }, // string, number, boolean, etc.
-    required: { type: Boolean, default: false }, // optional
-    default: { type: mongoose.Schema.Types.Mixed, default: undefined }, // allows any type
-  },
-  { _id: false }
-);
-
-const CollectionDefinitionSchema = new mongoose.Schema({
-  ownerId: { type: String, required: true },
-  collectionName: { type: String, required: true },
+const CollectionDefinitionSchema = new Schema({
+  collectionName: { type: String, unique: true },
   fields: {
-    type: [FieldSchema],
-    required: true,
+    type: Map,
+    of: String,
   },
+  source: {
+    type: String,
+    enum: ["mongoose", "sampled"],
+  },
+  lastSyncedAt: Date,
 });
 
-export default mongoose.models.CollectionDefinition ||
-  mongoose.model("CollectionDefinition", CollectionDefinitionSchema);
+export default mongoose.model(
+  "CollectionDefinitions",
+  CollectionDefinitionSchema
+);

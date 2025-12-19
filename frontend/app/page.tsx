@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Zap,
   ArrowRight,
@@ -18,16 +18,25 @@ import {
   Sparkles,
 } from "lucide-react";
 import { AIGenerationScreen } from "../components/workflow/AIGenerationScreen";
+import { RootDispatch, RootState } from "@/store";
+import { useDispatch, useSelector } from "react-redux";
+import { fetchDbSchemas } from "@/store/dbSchemasSlice";
 
 export default function LandingPage() {
   const [showGenerationScreen, setShowGenerationScreen] = useState(false);
-
+  const schemas = useSelector((state: RootState) => state.dbSchemas.schemas);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showAIModal, setShowAIModal] = useState(false);
+  const dispatch: RootDispatch = useDispatch();
   const [aiPrompt, setAiPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatingPrompt, setGeneratingPrompt] = useState("");
+  console.log("Schemas in LandingPage:", schemas);
   const [generationDone, setGenerationDone] = useState(false);
+
+  useEffect(() => {
+    dispatch(fetchDbSchemas());
+  }, [dispatch]);
 
   const generateAIWorkflow = async () => {
     const prompt = aiPrompt.trim();

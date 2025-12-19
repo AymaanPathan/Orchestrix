@@ -36,6 +36,7 @@ import { RootDispatch, RootState } from "@/store";
 import { useDispatch, useSelector } from "react-redux";
 import AnimatedDashedEdge from "@/components/Ui/AnimatedDashedEdge";
 import { useStreamGroup } from "@motiadev/stream-client-react";
+import { fetchDbSchemas } from "@/store/dbSchemasSlice";
 type ExecutionLog = {
   executionId: string;
   stepIndex: number;
@@ -51,6 +52,8 @@ export default function WorkflowPage() {
   const [graphMeta, setGraphMeta] = useState<any>(null);
   const dbSchemas = useSelector((state: RootState) => state.dbSchemas.schemas);
   const dispatch = useDispatch<RootDispatch>();
+  const schemas = useSelector((state: RootState) => state.dbSchemas.schemas);
+  console.log("DB Schemas in WorkflowPage:", schemas);
   const [nodes, setNodes, onNodesChange] = useNodesState<any>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<any>([]);
   const [selectedNode, setSelectedNode] = useState<any>(null);
@@ -84,6 +87,10 @@ export default function WorkflowPage() {
       _stepNumber: stepNumbers[n.id] ?? null,
     },
   }));
+
+  useEffect(() => {
+    dispatch(fetchDbSchemas());
+  }, [dispatch]);
 
   // ORDER MAPPING
   function computeStepMapping(nodes: any[], edges: any[]) {
