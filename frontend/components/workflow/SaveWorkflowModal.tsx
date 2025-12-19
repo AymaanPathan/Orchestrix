@@ -38,7 +38,7 @@ export default function SaveWorkflowModal({
   const [error, setError] = useState("");
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<
-    "overview" | "curl" | "javascript"
+    "overview" | "request" | "parameters" | "curl" | "javascript"
   >("overview");
 
   const generateSlug = (name: string) => {
@@ -315,7 +315,7 @@ console.log(result);`
                     className="space-y-4"
                   >
                     {/* Success Message */}
-                    {/* <div className="flex items-start gap-2.5 px-3 py-2.5 bg-emerald-500/[0.08] border border-emerald-400/[0.15] rounded-xl shadow-[inset_0_1px_1px_rgba(16,185,129,0.1)]">
+                    <div className="flex items-start gap-2.5 px-3 py-2.5 bg-emerald-500/[0.08] border border-emerald-400/[0.15] rounded-xl shadow-[inset_0_1px_1px_rgba(16,185,129,0.1)]">
                       <CheckCircle2
                         size={16}
                         className="text-emerald-400 mt-0.5 flex-shrink-0"
@@ -328,12 +328,14 @@ console.log(result);`
                           Your workflow is now accessible via API endpoint
                         </p>
                       </div>
-                    </div> */}
+                    </div>
 
                     {/* Tabs */}
-                    <div className="flex gap-1 p-0.5 bg-white/[0.02] rounded-lg border border-white/[0.06]">
+                    <div className="flex gap-1 p-0.5 bg-white/[0.02] rounded-lg border border-white/[0.06] overflow-x-auto">
                       {[
-                        { id: "overview", icon: BookOpen, label: "Details" },
+                        { id: "overview", icon: BookOpen, label: "Overview" },
+                        { id: "request", icon: FileJson, label: "Request" },
+                        { id: "parameters", icon: Zap, label: "Parameters" },
                         { id: "curl", icon: Terminal, label: "cURL" },
                         { id: "javascript", icon: Code, label: "JavaScript" },
                       ].map((tab) => (
@@ -341,10 +343,15 @@ console.log(result);`
                           key={tab.id}
                           onClick={() =>
                             setActiveTab(
-                              tab.id as "overview" | "curl" | "javascript"
+                              tab.id as
+                                | "overview"
+                                | "request"
+                                | "parameters"
+                                | "curl"
+                                | "javascript"
                             )
                           }
-                          className={`flex-1 px-2.5 py-2 rounded-md text-xs font-medium transition-all duration-200 ${
+                          className={`flex-1 min-w-fit px-2.5 py-2 rounded-md text-xs font-medium transition-all duration-200 ${
                             activeTab === tab.id
                               ? "bg-white/[0.08] text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)]"
                               : "text-white/50 hover:text-white/70 hover:bg-white/[0.03]"
@@ -408,7 +415,7 @@ console.log(result);`
                             {/* API Name */}
                             <div className="space-y-1.5">
                               <label className="flex items-center gap-1 text-[10px] font-medium text-white/50">
-                                <Zap size={11} />
+                                <Sparkles size={11} />
                                 API Name
                               </label>
                               <div className="px-2.5 py-2 bg-white/[0.02] border border-white/[0.06] rounded-lg">
@@ -458,84 +465,219 @@ console.log(result);`
                             </div>
                           </div>
 
-                          {/* Two Column Layout for Body and Variables */}
-                          <div className="flex gap-4 items-center justify-between">
-                            {/* Request Body */}
-                            <div className="w-80">
-                              <label className="flex items-center gap-1 text-[10px] font-medium text-white/50">
-                                <FileJson size={11} />
-                                Request Body
-                              </label>
-                              <div className="relative">
-                                <pre className="px-2.5 py-2 bg-[#0a0a0a]/80 border border-white/[0.06] rounded-lg overflow-x-auto max-h-32 shadow-[inset_0_1px_2px_rgba(0,0,0,0.3)]">
-                                  <code className="text-[10px] text-white/70 font-mono">
-                                    {JSON.stringify(exampleBody, null, 2)}
-                                  </code>
-                                </pre>
-                                <button
-                                  onClick={() =>
-                                    copyToClipboard(
-                                      JSON.stringify(exampleBody, null, 2),
-                                      "body"
-                                    )
-                                  }
-                                  className="absolute top-1.5 right-1.5 p-1 bg-white/[0.08] hover:bg-white/[0.12] border border-white/[0.08] rounded transition-all duration-200"
-                                  title="Copy"
-                                >
-                                  {copiedField === "body" ? (
-                                    <CheckCircle2
-                                      size={10}
-                                      className="text-emerald-400"
-                                    />
-                                  ) : (
-                                    <Copy size={10} className="text-white/50" />
-                                  )}
-                                </button>
+                          {/* Quick Stats */}
+                          <div className="grid grid-cols-2 gap-2.5">
+                            <div className="px-3 py-2.5 bg-gradient-to-br from-emerald-500/[0.06] to-emerald-600/[0.06] border border-emerald-400/[0.12] rounded-lg">
+                              <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-lg bg-emerald-400/10 flex items-center justify-center">
+                                  <FileJson
+                                    size={14}
+                                    className="text-emerald-400"
+                                  />
+                                </div>
+                                <div>
+                                  <p className="text-[10px] text-emerald-300/60 font-medium">
+                                    Request Body
+                                  </p>
+                                  <p className="text-xs text-emerald-300 font-semibold">
+                                    JSON Format
+                                  </p>
+                                </div>
                               </div>
                             </div>
 
-                            {/* Input Variables */}
-                            <div className="space-y-1.5">
-                              <label className="text-[10px] font-medium text-white/50">
-                                Input Parameters{" "}
-                                {savedData.inputVariables &&
-                                  savedData.inputVariables.length > 0 &&
-                                  `(${savedData.inputVariables.length})`}
-                              </label>
-                              <div className="space-y-1.5 max-h-32 overflow-y-auto pr-0.5">
-                                {savedData.inputVariables &&
-                                savedData.inputVariables.length > 0 ? (
-                                  savedData.inputVariables.map((v, i) => (
-                                    <div
-                                      key={i}
-                                      className="flex items-center gap-2 px-2.5 py-1.5 bg-white/[0.02] border border-white/[0.06] rounded-lg"
-                                    >
-                                      <div className="flex-1 min-w-0">
-                                        <div className="text-[10px] text-white/85 font-mono truncate">
-                                          {v.name}
-                                        </div>
-                                        {v.type && (
-                                          <div className="text-[9px] text-white/40 mt-0.5">
-                                            {v.type}
-                                          </div>
-                                        )}
-                                      </div>
-                                      {v.default !== undefined && (
-                                        <div className="px-1.5 py-0.5 bg-white/[0.06] rounded text-[9px] text-white/50 font-mono flex-shrink-0">
-                                          {JSON.stringify(v.default)}
-                                        </div>
-                                      )}
-                                    </div>
-                                  ))
-                                ) : (
-                                  <div className="px-2.5 py-6 bg-white/[0.02] border border-white/[0.06] rounded-lg text-center">
-                                    <p className="text-[10px] text-white/40">
-                                      No parameters defined
-                                    </p>
-                                  </div>
-                                )}
+                            <div className="px-3 py-2.5 bg-gradient-to-br from-purple-500/[0.06] to-purple-600/[0.06] border border-purple-400/[0.12] rounded-lg">
+                              <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-lg bg-purple-400/10 flex items-center justify-center">
+                                  <Zap size={14} className="text-purple-400" />
+                                </div>
+                                <div>
+                                  <p className="text-[10px] text-purple-300/60 font-medium">
+                                    Parameters
+                                  </p>
+                                  <p className="text-xs text-purple-300 font-semibold">
+                                    {savedData.inputVariables?.length || 0}{" "}
+                                    Input
+                                    {savedData.inputVariables?.length !== 1
+                                      ? "s"
+                                      : ""}
+                                  </p>
+                                </div>
                               </div>
                             </div>
+                          </div>
+                        </motion.div>
+                      )}
+
+                      {activeTab === "request" && (
+                        <motion.div
+                          key="request"
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -8 }}
+                          transition={{ duration: 0.2 }}
+                          className="space-y-3"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h3 className="text-xs font-semibold text-white/90">
+                                Request Body Schema
+                              </h3>
+                              <p className="text-[10px] text-white/40 mt-0.5">
+                                JSON payload for API calls
+                              </p>
+                            </div>
+                            <button
+                              onClick={() =>
+                                copyToClipboard(
+                                  JSON.stringify(exampleBody, null, 2),
+                                  "body"
+                                )
+                              }
+                              className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] rounded-lg transition-all duration-200 group"
+                            >
+                              {copiedField === "body" ? (
+                                <>
+                                  <CheckCircle2
+                                    size={12}
+                                    className="text-emerald-400"
+                                  />
+                                  <span className="text-[10px] text-emerald-400 font-medium">
+                                    Copied!
+                                  </span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy
+                                    size={12}
+                                    className="text-white/50 group-hover:text-white/70"
+                                  />
+                                  <span className="text-[10px] text-white/50 group-hover:text-white/70 font-medium">
+                                    Copy JSON
+                                  </span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+
+                          <div className="relative group">
+                            <pre className="px-4 py-3 bg-[#0a0a0a]/80 border border-white/[0.06] rounded-lg overflow-x-auto max-h-64 shadow-[inset_0_1px_2px_rgba(0,0,0,0.3)] hover:border-white/[0.1] transition-colors">
+                              <code className="text-[11px] text-white/70 font-mono leading-relaxed">
+                                {JSON.stringify(exampleBody, null, 2)}
+                              </code>
+                            </pre>
+                          </div>
+
+                          <div className="flex items-start gap-2 px-3 py-2.5 bg-blue-500/[0.06] border border-blue-400/[0.12] rounded-lg">
+                            <FileJson
+                              size={12}
+                              className="text-blue-400 mt-0.5 flex-shrink-0"
+                            />
+                            <div className="space-y-1">
+                              <p className="text-[10px] font-medium text-blue-300">
+                                Content-Type: application/json
+                              </p>
+                              <p className="text-[9px] text-blue-300/70 leading-relaxed">
+                                Send this JSON structure in the request body
+                                when calling your API endpoint. All parameters
+                                should be nested under the "input" key.
+                              </p>
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+
+                      {activeTab === "parameters" && (
+                        <motion.div
+                          key="parameters"
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -8 }}
+                          transition={{ duration: 0.2 }}
+                          className="space-y-3"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h3 className="text-xs font-semibold text-white/90">
+                                Input Parameters
+                              </h3>
+                              <p className="text-[10px] text-white/40 mt-0.5">
+                                {savedData.inputVariables &&
+                                savedData.inputVariables.length > 0
+                                  ? `${
+                                      savedData.inputVariables.length
+                                    } parameter${
+                                      savedData.inputVariables.length !== 1
+                                        ? "s"
+                                        : ""
+                                    } defined`
+                                  : "No parameters configured"}
+                              </p>
+                            </div>
+                            {savedData.inputVariables &&
+                              savedData.inputVariables.length > 0 && (
+                                <span className="px-2.5 py-1 bg-purple-400/10 border border-purple-400/20 rounded-lg text-[10px] text-purple-300 font-semibold">
+                                  {savedData.inputVariables.length} Total
+                                </span>
+                              )}
+                          </div>
+
+                          <div className="max-h-72 overflow-y-auto pr-1 custom-scrollbar">
+                            {savedData.inputVariables &&
+                            savedData.inputVariables.length > 0 ? (
+                              <div className="space-y-2.5">
+                                {savedData.inputVariables.map((v, i) => (
+                                  <div
+                                    key={i}
+                                    className="p-3 bg-white/[0.02] hover:bg-white/[0.04] border border-white/[0.06] hover:border-white/[0.1] rounded-lg transition-all duration-200 group"
+                                  >
+                                    <div className="flex items-start justify-between gap-3 mb-2">
+                                      <div className="flex items-center gap-2">
+                                        <div className="w-6 h-6 rounded-md bg-purple-400/10 flex items-center justify-center">
+                                          <Zap
+                                            size={12}
+                                            className="text-purple-400"
+                                          />
+                                        </div>
+                                        <code className="text-xs text-white/90 font-mono font-semibold">
+                                          {v.name}
+                                        </code>
+                                      </div>
+                                      {v.type && (
+                                        <span className="px-2 py-0.5 bg-blue-400/10 border border-blue-400/20 rounded-md text-[9px] text-blue-300 font-semibold uppercase tracking-wide">
+                                          {v.type}
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    {v.default !== undefined && (
+                                      <div className="flex items-start gap-2 pt-2 border-t border-white/[0.04]">
+                                        <span className="text-[10px] text-white/40 font-medium min-w-fit">
+                                          Default value:
+                                        </span>
+                                        <code className="text-[10px] text-emerald-400 font-mono flex-1">
+                                          {JSON.stringify(v.default)}
+                                        </code>
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="py-12 text-center">
+                                <div className="w-14 h-14 mx-auto mb-3 rounded-xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center">
+                                  <Zap size={20} className="text-white/30" />
+                                </div>
+                                <p className="text-xs text-white/50 font-medium">
+                                  No parameters defined
+                                </p>
+                                <p className="text-[10px] text-white/30 mt-1 max-w-xs mx-auto">
+                                  This workflow doesn't require any input
+                                  parameters. You can call it with an empty
+                                  request body.
+                                </p>
+                              </div>
+                            )}
                           </div>
                         </motion.div>
                       )}
@@ -614,6 +756,23 @@ console.log(result);`
                         </motion.div>
                       )}
                     </AnimatePresence>
+
+                    <style>{`
+                      .custom-scrollbar::-webkit-scrollbar {
+                        width: 4px;
+                      }
+                      .custom-scrollbar::-webkit-scrollbar-track {
+                        background: rgba(255, 255, 255, 0.02);
+                        border-radius: 4px;
+                      }
+                      .custom-scrollbar::-webkit-scrollbar-thumb {
+                        background: rgba(255, 255, 255, 0.1);
+                        border-radius: 4px;
+                      }
+                      .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+                        background: rgba(255, 255, 255, 0.15);
+                      }
+                    `}</style>
 
                     {/* Done Button */}
                     <button
