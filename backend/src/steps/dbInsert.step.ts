@@ -17,6 +17,7 @@ import {
   logExecutionFinished,
   logExecutionFailed,
 } from "../lib/logStep";
+import { getModel } from "../lib/getModel";
 
 export const config: EventConfig = {
   name: "dbInsert",
@@ -29,7 +30,17 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
   const startedAt = Date.now();
   const { streams } = ctx;
 
-  const { collection, data, output, steps, index, vars, executionId } = payload;
+  const { collection, data, output, steps, index, vars, executionId } =
+    payload as {
+      collection: string;
+      data: Record<string, any>;
+      output?: string;
+
+      steps: any[];
+      index: number;
+      vars: Record<string, any>;
+      executionId: string;
+    };
 
   const totalSteps = steps?.length || 0;
   const isLastStep = index >= totalSteps - 1;
@@ -75,16 +86,7 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
       message: `Looking for model: ${collection}`,
     });
 
-    const Model =
-      mongoose.connection.models[collection] ||
-      mongoose.connection.models[collection] ||
-      mongoose.connection.models[
-        collection?.charAt(0).toUpperCase() + collection?.slice(1)
-      ];
-
-    if (!Model) {
-      throw new Error(`Model not found: ${collection}`);
-    }
+    const Model = getModel(collection);
 
     // ───────────────── STREAM: MODEL FOUND ─────────────────
     await logStepInfo(streams, {
@@ -172,7 +174,7 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
       message: `New record created with ID: ${created._id || "N/A"}`,
       data: created,
       metadata: {
-        insertedId: created._id,
+        insertedId: created._id ,
         collection,
         outputVariable: output || "created",
       },

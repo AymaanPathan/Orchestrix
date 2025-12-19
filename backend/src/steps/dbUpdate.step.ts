@@ -8,6 +8,7 @@ import {
   logSuccess,
   logError,
 } from "../lib/consoleLogger";
+import { getModel } from "../lib/getModel";
 
 export const config: EventConfig = {
   name: "dbUpdate",
@@ -57,13 +58,7 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
     if (!collection) {
       throw new Error("dbUpdate requires collection");
     }
-    const Model =
-      mongoose.connection.models[collection] ||
-      mongoose.connection.models[collection] ||
-      mongoose.connection.models[
-        collection?.charAt(0).toUpperCase() + collection?.slice(1)
-      ];
-
+    const Model = getModel(collection);
     if (!Model) {
       throw new Error(`Model not found: ${collection}`);
     }

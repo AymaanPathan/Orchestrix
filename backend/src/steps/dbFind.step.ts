@@ -17,6 +17,7 @@ import {
   logExecutionFinished,
   logExecutionFailed,
 } from "../lib/logStep";
+import { getModel } from "../lib/getModel";
 
 export const config: EventConfig = {
   name: "dbFind",
@@ -38,7 +39,16 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
     index,
     vars,
     executionId,
-  } = payload;
+  } = payload as {
+    collection: string;
+    filters: Record<string, any>;
+    findType?: "findOne" | "many";
+    output?: string;
+    steps: any[];
+    index: number;
+    vars: Record<string, any>;
+    executionId: string;
+  };
 
   const totalSteps = steps?.length || 0;
   const isLastStep = index >= totalSteps - 1;
@@ -111,12 +121,7 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
       message: `Looking for model: ${collection}`,
     });
 
-    const Model =
-      mongoose.connection.models[collection] ||
-      mongoose.connection.models[collection] ||
-      mongoose.connection.models[
-        collection?.charAt(0).toUpperCase() + collection?.slice(1)
-      ];
+    const Model = getModel(collection);
 
     if (!Model) {
       throw new Error(`Model not found: ${collection}`);
