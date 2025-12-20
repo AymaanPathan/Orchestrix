@@ -54,7 +54,7 @@ export function buildForExecute(nodes: any[], edges: any[]) {
       steps.push({
         id: stepId,
         type: "inputValidation",
-        rules: raw.rules || [],
+        rules: transformed.rules || [],
         output: raw.outputVar || "validated",
         pass: node.data?.pass,
       });

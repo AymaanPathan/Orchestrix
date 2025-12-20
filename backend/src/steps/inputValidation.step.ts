@@ -2,7 +2,7 @@
    InputValidation Step (Motia EVENT)
 -------------------------------------------------------------*/
 import { EventConfig, StepHandler } from "motia";
-import { resolveObject } from "../lib/resolveValue";
+import { logExecutionFailed, logExecutionFinished } from "../lib/logStep";
 import {
   logStepStart,
   logKV,
@@ -74,7 +74,7 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
         executionId,
         stepIndex: index,
         stepType: "inputValidation",
-        phase: "start",
+        phase: "step_started",
         title: "Input validation started",
         timestamp: Date.now(),
       }
@@ -125,18 +125,18 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
       }
     );
 
-    // ❌ Validation failed → stop workflow
     if (Object.keys(errors).length > 0) {
       logError("inputValidation", errors);
 
+      // 🔴 STEP ERROR (UI RECOGNIZES THIS)
       await streams.executionLog.set(
         executionId,
-        `inputValidation-failed-${index}`,
+        `inputValidation-error-${index}`,
         {
           executionId,
           stepIndex: index,
           stepType: "inputValidation",
-          phase: "end",
+          phase: "error",
           title: "Input validation failed",
           data: errors,
           durationMs: Date.now() - start,
@@ -144,12 +144,23 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
         }
       );
 
+      // 🔴 EXECUTION FAILED (THIS STOPS UI SPINNER)
+      await logExecutionFailed(streams, {
+        executionId,
+        failedStepIndex: index,
+        totalSteps: steps?.length || 0,
+        error: "Input validation failed",
+      });
+
       throw new Error("Input validation failed");
     }
+    const totalSteps = steps?.length || 0;
+    const isLastStep = index >= totalSteps - 1;
 
+
+    
     // ✅ Validation passed
     logSuccess("inputValidation", Date.now() - start);
-
     await streams.executionLog.set(
       executionId,
       `inputValidation-end-${index}`,
@@ -157,12 +168,21 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
         executionId,
         stepIndex: index,
         stepType: "inputValidation",
-        phase: "end",
+        phase: "step_finished", // ✅ IMPORTANT
         title: "Input validation completed",
         durationMs: Date.now() - start,
         timestamp: Date.now(),
       }
     );
+
+    if (isLastStep) {
+      await logExecutionFinished(streams, {
+        executionId,
+        totalSteps,
+        startedAt: start,
+      });
+      return; // ⛔ DO NOT emit workflow.run
+    }
 
     // 🔁 Continue workflow
     await ctx.emit({

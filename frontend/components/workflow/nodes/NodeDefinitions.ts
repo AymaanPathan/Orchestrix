@@ -249,7 +249,7 @@ export const NodeDefinitions: Record<string, NodeConfig> = {
       const newRules = (fields.rules || []).map((r: any) => {
         // If field points to a known var name → wrap it
         if (available?.includes(r.field)) {
-          return { ...r, field: varWrap(r.field) };
+          return { ...r, field: `input.${r.field}` };
         }
         return r;
       });
