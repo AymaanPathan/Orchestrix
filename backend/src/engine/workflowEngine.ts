@@ -1,4 +1,3 @@
-import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { resolveObject } from "../lib/resolveValue";
@@ -7,64 +6,182 @@ import { connectMongo } from "../lib/mongo";
 import { getModel } from "../lib/getModel";
 
 export async function runEngine(steps: any[], input: any, headers: any = {}) {
-  connectMongo();
+  await connectMongo();
+
   const vars: Record<string, any> = {
     input: { ...input },
   };
 
-  const logs: any[] = [];
+  const stepResponses: any[] = [];
+  const startedAt = Date.now();
 
   for (let index = 0; index < steps.length; index++) {
     const step = steps[index];
+    const stepStart = Date.now();
 
-    logs.push({
-      step: index,
-      type: step.type,
-      phase: "start",
-    });
+    const stepLog: any = {
+      stepIndex: index,
+      stepType: step.type,
+      stepName: step.name || `${step.type}_${index}`,
+      phase: "step_started",
+      input: {},
+      output: null,
+      error: null,
+      startedAt: stepStart,
+    };
 
     try {
       // ------------------------------------------------
-      // 1️⃣ INPUT
+      // INPUT
       // ------------------------------------------------
       if (step.type === "input") {
         const variables = step.data?.variables || [];
 
         for (const v of variables) {
           if (!(v.name in vars.input)) {
-            vars.input[v.name] = v.default ?? "";
+            vars.input[v.name] = v.default ?? null;
           }
         }
 
-        logs.push({ step: index, status: "done" });
-        continue;
+        stepLog.input = {
+          variablesConfigured: variables.map((v: any) => ({
+            name: v.name,
+            hasDefault: v.default !== undefined,
+            default: v.default,
+          })),
+        };
+        stepLog.output = {
+          input: vars.input,
+          variablesSet: Object.keys(vars.input),
+        };
       }
 
       // ------------------------------------------------
-      // 2️⃣ INPUT VALIDATION
+      // INPUT VALIDATION
       // ------------------------------------------------
-      if (step.type === "inputValidation") {
+      else if (step.type === "inputValidation") {
+        const errors: Record<string, string[]> = {};
+        const validationDetails: any[] = [];
+        const resolvedValues: Record<string, any> = {};
+
         for (const rule of step.rules || []) {
           const value = resolveObject(vars, rule.field);
+          resolvedValues[rule.field] = value;
 
-          if (rule.required && (value === undefined || value === "")) {
-            throw new Error(`Validation failed: ${rule.field}`);
+          const ruleResult: any = {
+            field: rule.field,
+            value: value,
+            valueType: typeof value,
+            rules: {},
+            passed: true,
+            failures: [],
+          };
+
+          // Required validation
+          if (rule.required !== undefined) {
+            ruleResult.rules.required = rule.required;
+
+            if (
+              rule.required &&
+              (value === undefined || value === null || value === "")
+            ) {
+              if (!errors[rule.field]) errors[rule.field] = [];
+              errors[rule.field].push("Field is required");
+              ruleResult.passed = false;
+              ruleResult.failures.push({
+                rule: "required",
+                expected: true,
+                actual: "missing or empty",
+              });
+            }
           }
+
+          // Type validation
+          if (value !== undefined && value !== null && rule.type) {
+            ruleResult.rules.type = rule.type;
+
+            if (rule.type === "number") {
+              const isValidNumber = !isNaN(Number(value)) && value !== "";
+              if (!isValidNumber) {
+                if (!errors[rule.field]) errors[rule.field] = [];
+                errors[rule.field].push("Expected number");
+                ruleResult.passed = false;
+                ruleResult.failures.push({
+                  rule: "type",
+                  expected: "number",
+                  actual: typeof value,
+                });
+              }
+            }
+
+            if (rule.type === "string") {
+              if (typeof value !== "string") {
+                if (!errors[rule.field]) errors[rule.field] = [];
+                errors[rule.field].push("Expected string");
+                ruleResult.passed = false;
+                ruleResult.failures.push({
+                  rule: "type",
+                  expected: "string",
+                  actual: typeof value,
+                });
+              }
+            }
+
+            if (rule.type === "boolean") {
+              if (typeof value !== "boolean") {
+                if (!errors[rule.field]) errors[rule.field] = [];
+                errors[rule.field].push("Expected boolean");
+                ruleResult.passed = false;
+                ruleResult.failures.push({
+                  rule: "type",
+                  expected: "boolean",
+                  actual: typeof value,
+                });
+              }
+            }
+          }
+
+          validationDetails.push(ruleResult);
         }
 
+        stepLog.input = {
+          values: resolvedValues,
+          rulesCount: step.rules?.length || 0,
+        };
+
+        // ❌ Validation failed
+        if (Object.keys(errors).length > 0) {
+          stepLog.phase = "error";
+          stepLog.error = {
+            message: "Input validation failed",
+            summary: `${Object.keys(errors).length} field(s) failed validation`,
+            errors: errors,
+            validationDetails: validationDetails,
+            failedFields: Object.keys(errors),
+          };
+
+          const err = new Error("Input validation failed");
+          (err as any).details = errors;
+          throw err;
+        }
+
+        // ✅ Validation passed
         vars[step.output || "validated"] = true;
-        logs.push({ step: index, status: "done" });
-        continue;
+
+        stepLog.output = {
+          validated: true,
+          validationDetails: validationDetails,
+          summary: `All ${validationDetails.length} validation rule(s) passed`,
+        };
       }
 
       // ------------------------------------------------
-      // 3️⃣ DB FIND
+      // DB FIND
       // ------------------------------------------------
-      if (step.type === "dbFind") {
+      else if (step.type === "dbFind") {
         const Model = getModel(step);
-
         if (!Model) {
-          throw new Error(`Model not found: ${step.model || step.collection}`);
+          throw new Error(`Model not found: ${step.collection}`);
         }
 
         const filters = resolveObject(vars, step.filters || {});
@@ -74,67 +191,94 @@ export async function runEngine(steps: any[], input: any, headers: any = {}) {
             : await Model.findOne(filters);
 
         vars[step.output || "found"] = result;
-        logs.push({ step: index, result });
-        continue;
+
+        stepLog.input = {
+          collection: step.collection,
+          findType: step.findType || "one",
+          filters,
+        };
+        stepLog.output = {
+          found: result !== null,
+          count: Array.isArray(result) ? result.length : result ? 1 : 0,
+          data: result,
+        };
       }
 
       // ------------------------------------------------
-      // 4️⃣ DB INSERT
+      // DB INSERT
       // ------------------------------------------------
-      if (step.type === "dbInsert") {
+      else if (step.type === "dbInsert") {
         const Model = getModel(step);
+        if (!Model) {
+          throw new Error(`Model not found: ${step.collection}`);
+        }
 
-        if (!Model)
-          throw new Error(`Model not found: ${step.model || step.collection}`);
-
-        const rawData = step.data?.data || {};
-        const data = resolveObject(vars, rawData);
+        const data = resolveObject(vars, step.data || {});
+        const hasPassword = !!data.password;
 
         if (data.password) {
           data.password = await bcrypt.hash(data.password, 10);
         }
 
         const created = await Model.create(data);
+        vars[step.output || "created"] = created;
 
-        const outputKey = step.output || step.data?.outputVar || "created";
-        vars[outputKey] = created;
-
-        logs.push({ step: index, created });
-        continue;
+        stepLog.input = {
+          collection: step.collection,
+          fields: Object.keys(step.data || {}),
+          hasPassword,
+        };
+        stepLog.output = {
+          success: true,
+          id: created._id || created.id,
+          data: created,
+        };
       }
 
       // ------------------------------------------------
-      // 5️⃣ DB UPDATE
+      // DB UPDATE
       // ------------------------------------------------
-      if (step.type === "dbUpdate") {
+      else if (step.type === "dbUpdate") {
         const Model = getModel(step);
-
         if (!Model) {
-          throw new Error(`Model not found: ${step.model || step.collection}`);
+          throw new Error(`Model not found: ${step.collection}`);
         }
 
-        const filter = resolveObject(vars, step.filter);
-        const data = resolveObject(vars, step.data);
-
-        const result = await Model.findOneAndUpdate(
+        const filter = resolveObject(vars, step.filter || {});
+        const data = resolveObject(vars, step.data || {});
+        const updated = await Model.findOneAndUpdate(
           filter,
           { $set: data },
           { new: true }
         );
 
-        vars[step.output] = result;
-        logs.push({ step: index, result });
-        continue;
+        vars[step.output || "updated"] = updated;
+
+        stepLog.input = {
+          collection: step.collection,
+          filter,
+          updateFields: Object.keys(data),
+        };
+        stepLog.output = {
+          success: !!updated,
+          found: !!updated,
+          data: updated,
+        };
       }
 
       // ------------------------------------------------
-      // 6️⃣ AUTH MIDDLEWARE
+      // AUTH MIDDLEWARE
       // ------------------------------------------------
-      if (step.type === "authMiddleware") {
+      else if (step.type === "authMiddleware") {
         const auth = headers.authorization || headers.Authorization || null;
 
+        stepLog.input = {
+          hasAuthHeader: !!auth,
+          headerType: auth?.split(" ")[0] || null,
+        };
+
         if (!auth?.startsWith("Bearer ")) {
-          throw new Error("Missing Authorization token");
+          throw new Error("Missing or invalid Authorization header");
         }
 
         const token = auth.split(" ")[1];
@@ -143,84 +287,103 @@ export async function runEngine(steps: any[], input: any, headers: any = {}) {
         vars.currentUser = decoded;
         vars.__auth = decoded;
 
-        logs.push({ step: index, status: "passed" });
-        continue;
+        stepLog.output = {
+          authenticated: true,
+          userId: (decoded as any).userId || (decoded as any).id,
+          user: decoded,
+        };
       }
 
       // ------------------------------------------------
-      // 7️⃣ EMAIL SEND
+      // EMAIL SEND
       // ------------------------------------------------
-      if (step.type === "emailSend") {
-        // ✅ Resolve all email fields using resolveObject
-        // This handles both {{var}} templates and direct dot notation
+      else if (step.type === "emailSend") {
         const to = resolveObject(vars, step.to);
         const subject = resolveObject(vars, step.subject);
         const body = resolveObject(vars, step.body);
 
-        console.log("📧 Email Send - Resolution Debug", {
-          original: {
-            to: step.to,
-            subject: step.subject,
-            body: step.body?.substring(0, 100) + "...",
-          },
-          resolved: {
-            to,
-            subject,
-            body: body?.substring(0, 100) + "...",
-          },
-          vars: {
-            input: vars.input,
-          },
-        });
+        stepLog.input = {
+          to,
+          subject,
+          bodyLength: body?.length || 0,
+        };
 
-        // Validate resolved values
         if (!to || !subject || !body) {
           throw new Error(
-            `Email fields missing after resolution. To: ${to}, Subject: ${subject}, Body: ${!!body}`
+            "Email resolution failed: missing required fields (to, subject, or body)"
           );
         }
 
         const result = await sendEmail({ to, subject, body });
-
         vars[step.output || "emailResult"] = result;
-        logs.push({
-          step: index,
+
+        stepLog.output = {
+          sent: true,
+          recipient: to,
           result,
-          email: {
-            to,
-            subject,
-            sent: result.success,
-          },
-        });
-        continue;
+        };
       }
 
       // ------------------------------------------------
       // UNKNOWN STEP
       // ------------------------------------------------
-      logs.push({
-        step: index,
-        warning: `Unknown step type: ${step.type}`,
-      });
+      else {
+        stepLog.phase = "error";
+        stepLog.error = {
+          message: `Unknown step type: ${step.type}`,
+          availableTypes: [
+            "input",
+            "inputValidation",
+            "dbFind",
+            "dbInsert",
+            "dbUpdate",
+            "authMiddleware",
+            "emailSend",
+          ],
+        };
+        throw new Error(`Unknown step type: ${step.type}`);
+      }
+
+      stepLog.phase = "step_finished";
+      stepLog.durationMs = Date.now() - stepStart;
+      stepResponses.push(stepLog);
     } catch (err: any) {
-      logs.push({
-        step: index,
-        phase: "error",
-        error: err.message || "Step failed",
-      });
+      stepLog.phase = "error";
+
+      // Enhanced error logging
+      stepLog.error = stepLog.error || {
+        message: err.message || "Step failed",
+        type: err.name || "Error",
+        stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
+      };
+
+      // Preserve structured validation errors
+      if (err.details) {
+        stepLog.error.validationErrors = err.details;
+      }
+
+      stepLog.durationMs = Date.now() - stepStart;
+      stepResponses.push(stepLog);
 
       return {
         ok: false,
         failedStep: index,
-        error: err.message,
-        logs,
+        failedStepName: step.name || `${step.type}_${index}`,
+        error:
+          typeof stepLog.error === "string"
+            ? stepLog.error
+            : stepLog.error.message,
+        errorDetails: stepLog.error,
+        steps: stepResponses,
+        totalDurationMs: Date.now() - startedAt,
       };
     }
   }
 
   return {
     ok: true,
-    logs,
+    steps: stepResponses,
     output: vars,
+    totalDurationMs: Date.now() - startedAt,
   };
 }
