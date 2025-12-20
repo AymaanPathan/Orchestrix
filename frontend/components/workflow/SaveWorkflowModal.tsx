@@ -315,20 +315,6 @@ console.log(result);`
                     className="space-y-4"
                   >
                     {/* Success Message */}
-                    <div className="flex items-start gap-2.5 px-3 py-2.5 bg-emerald-500/[0.08] border border-emerald-400/[0.15] rounded-xl shadow-[inset_0_1px_1px_rgba(16,185,129,0.1)]">
-                      <CheckCircle2
-                        size={16}
-                        className="text-emerald-400 mt-0.5 flex-shrink-0"
-                      />
-                      <div className="flex-1">
-                        <p className="text-xs font-medium text-emerald-300">
-                          Successfully published
-                        </p>
-                        <p className="text-[10px] text-emerald-400/60 mt-0.5">
-                          Your workflow is now accessible via API endpoint
-                        </p>
-                      </div>
-                    </div>
 
                     {/* Tabs */}
                     <div className="flex gap-1 p-0.5 bg-white/[0.02] rounded-lg border border-white/[0.06] overflow-x-auto">

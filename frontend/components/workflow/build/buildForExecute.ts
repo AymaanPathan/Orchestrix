@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 export function buildForExecute(nodes: any[], edges: any[]) {
   validateNoCycles(nodes, edges);
 
