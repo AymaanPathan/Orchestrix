@@ -5,12 +5,10 @@ export function getModel(collectionName: string) {
     throw new Error("Collection name missing");
   }
 
-  // 1️⃣ Try direct model name first (fast path)
   if (mongoose.models[collectionName]) {
     return mongoose.models[collectionName];
   }
 
-  // 2️⃣ Find model by collection name
   const model = Object.values(mongoose.models).find(
     (m) => m.collection?.name === collectionName
   );
