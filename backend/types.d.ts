@@ -16,7 +16,6 @@ declare module 'motia' {
     'workflow.run': EventHandler<never, { topic: 'input'; data: never } | { topic: 'dbFind'; data: never } | { topic: 'dbInsert'; data: never } | { topic: 'dbUpdate'; data: never } | { topic: 'delay'; data: never } | { topic: 'authMiddleware'; data: never } | { topic: 'emailSend'; data: never } | { topic: 'inputValidation'; data: never }>
     'saveWorkflow': ApiRouteHandler<Record<string, unknown>, unknown, never>
     'runWorkflowPublic': ApiRouteHandler<Record<string, unknown>, unknown, never>
-    'inputValidation': EventHandler<never, { topic: 'workflow.run'; data: never }>
     'input': EventHandler<never, { topic: 'workflow.run'; data: never }>
     'getDbSchemas': ApiRouteHandler<Record<string, unknown>, unknown, never>
     'generateWorkflow': ApiRouteHandler<Record<string, unknown>, unknown, never>
@@ -30,6 +29,7 @@ declare module 'motia' {
     'authMiddleware': EventHandler<never, { topic: 'workflow.run'; data: never }>
     'ProcessGreeting': EventHandler<{ timestamp: string; appName: string; greetingPrefix: string; requestId: string }, never>
     'HelloAPI': ApiRouteHandler<Record<string, unknown>, ApiResponse<200, { message: string; status: string; appName: string }>, { topic: 'process-greeting'; data: { timestamp: string; appName: string; greetingPrefix: string; requestId: string } }>
+    'inputValidation': EventHandler<never, { topic: 'workflow.run'; data: never }>
   }
     
 }

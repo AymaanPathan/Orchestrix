@@ -157,8 +157,6 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
     const totalSteps = steps?.length || 0;
     const isLastStep = index >= totalSteps - 1;
 
-
-    
     // ✅ Validation passed
     logSuccess("inputValidation", Date.now() - start);
     await streams.executionLog.set(
@@ -185,15 +183,30 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
     }
 
     // 🔁 Continue workflow
+    // Take original input object
+    const inputData = vars.input || {};
+
+    // Re-emit validated data
+    const nextVars = {
+      ...vars,
+
+      // optional grouped object
+      [output]: {
+        ok: true,
+      },
+    };
+
+    // 🔥 FLATTEN INPUT FIELDS (THIS IS WHAT YOU WANT)
+    Object.keys(inputData).forEach((key) => {
+      nextVars[key] = inputData[key];
+    });
+
     await ctx.emit({
       topic: "workflow.run",
       data: {
         steps,
         index: index + 1,
-        vars: {
-          ...vars,
-          [output]: true, // or store validated input if you want
-        },
+        vars: nextVars,
         executionId,
       },
     });

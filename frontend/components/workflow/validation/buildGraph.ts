@@ -91,7 +91,18 @@ function resolveOutputVars(node: any, dbSchemas: Record<string, string[]>) {
 
   // INPUT VALIDATION: simple output
   if (node.type === "inputValidation") {
-    return [outVar || "validated"];
+    const rules = node.data?.fields?.rules || [];
+
+    const fields = rules
+      .map((r: any) =>
+        typeof r.field === "string" ? r.field.replace(/^{{|}}$/g, "") : null
+      )
+      .filter(Boolean);
+
+    return [
+      outVar || "validated",
+      ...fields, // 🔥 name, email, etc
+    ];
   }
 
   // USER LOGIN: return loginResult with nested fields
