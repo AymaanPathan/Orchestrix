@@ -1,4 +1,3 @@
-import mongoose from "mongoose";
 import { connectMongo } from "../lib/mongo";
 import { resolveObject } from "../lib/resolveValue";
 import {

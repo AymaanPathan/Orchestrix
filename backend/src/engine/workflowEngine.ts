@@ -4,8 +4,19 @@ import { resolveObject } from "../lib/resolveValue";
 import { sendEmail } from "../lib/email";
 import { connectMongo } from "../lib/mongo";
 import { getModel } from "../lib/getModel";
+import {
+  logSection,
+  logStepStart,
+  logKV,
+  logSuccess,
+  logError,
+} from "../lib/consoleLogger";
 
 export async function runEngine(steps: any[], input: any, headers: any = {}) {
+  logSection("WORKFLOW ENGINE STARTED");
+  logKV("Steps received", steps);
+  logKV("Initial input", input);
+
   await connectMongo();
 
   const vars: Record<string, any> = {
@@ -18,6 +29,10 @@ export async function runEngine(steps: any[], input: any, headers: any = {}) {
   for (let index = 0; index < steps.length; index++) {
     const step = steps[index];
     const stepStart = Date.now();
+
+    logStepStart(index, step.type);
+    logKV("Step raw config", step);
+    logKV("Vars at step start", vars);
 
     const stepLog: any = {
       stepIndex: index,
@@ -35,6 +50,8 @@ export async function runEngine(steps: any[], input: any, headers: any = {}) {
       // INPUT
       // ------------------------------------------------
       if (step.type === "input") {
+        logKV("Input variables config", step.data?.variables);
+
         const variables = step.data?.variables || [];
 
         for (const v of variables) {
@@ -43,6 +60,8 @@ export async function runEngine(steps: any[], input: any, headers: any = {}) {
           }
         }
 
+        logKV("Vars after input", vars.input);
+
         stepLog.input = {
           variablesConfigured: variables.map((v: any) => ({
             name: v.name,
@@ -50,141 +69,93 @@ export async function runEngine(steps: any[], input: any, headers: any = {}) {
             default: v.default,
           })),
         };
+
         stepLog.output = {
           input: vars.input,
           variablesSet: Object.keys(vars.input),
         };
+
+        logSuccess("input", Date.now() - stepStart);
       }
 
       // ------------------------------------------------
       // INPUT VALIDATION
       // ------------------------------------------------
       else if (step.type === "inputValidation") {
+        logKV("Validation rules", step.rules);
+
         const errors: Record<string, string[]> = {};
-        const validationDetails: any[] = [];
+        const validationDetails: any[] = {};
         const resolvedValues: Record<string, any> = {};
 
         for (const rule of step.rules || []) {
           const value = resolveObject(vars, rule.field);
           resolvedValues[rule.field] = value;
 
-          const ruleResult: any = {
-            field: rule.field,
-            value: value,
-            valueType: typeof value,
-            rules: {},
-            passed: true,
-            failures: [],
-          };
-
-          // Required validation
-          if (rule.required !== undefined) {
-            ruleResult.rules.required = rule.required;
-
-            if (
-              rule.required &&
-              (value === undefined || value === null || value === "")
-            ) {
-              if (!errors[rule.field]) errors[rule.field] = [];
-              errors[rule.field].push("Field is required");
-              ruleResult.passed = false;
-              ruleResult.failures.push({
-                rule: "required",
-                expected: true,
-                actual: "missing or empty",
-              });
-            }
+          if (
+            rule.required &&
+            (value === undefined || value === null || value === "")
+          ) {
+            errors[rule.field] = errors[rule.field] || [];
+            errors[rule.field].push("Field is required");
           }
 
-          // Type validation
-          if (value !== undefined && value !== null && rule.type) {
-            ruleResult.rules.type = rule.type;
-
-            if (rule.type === "number") {
-              const isValidNumber = !isNaN(Number(value)) && value !== "";
-              if (!isValidNumber) {
-                if (!errors[rule.field]) errors[rule.field] = [];
-                errors[rule.field].push("Expected number");
-                ruleResult.passed = false;
-                ruleResult.failures.push({
-                  rule: "type",
-                  expected: "number",
-                  actual: typeof value,
-                });
-              }
-            }
-
-            if (rule.type === "string") {
-              if (typeof value !== "string") {
-                if (!errors[rule.field]) errors[rule.field] = [];
-                errors[rule.field].push("Expected string");
-                ruleResult.passed = false;
-                ruleResult.failures.push({
-                  rule: "type",
-                  expected: "string",
-                  actual: typeof value,
-                });
-              }
-            }
-
-            if (rule.type === "boolean") {
-              if (typeof value !== "boolean") {
-                if (!errors[rule.field]) errors[rule.field] = [];
-                errors[rule.field].push("Expected boolean");
-                ruleResult.passed = false;
-                ruleResult.failures.push({
-                  rule: "type",
-                  expected: "boolean",
-                  actual: typeof value,
-                });
-              }
-            }
+          if (
+            rule.type === "number" &&
+            value !== undefined &&
+            isNaN(Number(value))
+          ) {
+            errors[rule.field] = errors[rule.field] || [];
+            errors[rule.field].push("Expected number");
           }
 
-          validationDetails.push(ruleResult);
+          if (
+            rule.type === "string" &&
+            value !== undefined &&
+            typeof value !== "string"
+          ) {
+            errors[rule.field] = errors[rule.field] || [];
+            errors[rule.field].push("Expected string");
+          }
+
+          if (
+            rule.type === "boolean" &&
+            value !== undefined &&
+            typeof value !== "boolean"
+          ) {
+            errors[rule.field] = errors[rule.field] || [];
+            errors[rule.field].push("Expected boolean");
+          }
         }
 
-        stepLog.input = {
-          values: resolvedValues,
-          rulesCount: step.rules?.length || 0,
-        };
+        logKV("Resolved validation values", resolvedValues);
 
-        // ❌ Validation failed
         if (Object.keys(errors).length > 0) {
-          stepLog.phase = "error";
-          stepLog.error = {
-            message: "Input validation failed",
-            summary: `${Object.keys(errors).length} field(s) failed validation`,
-            errors: errors,
-            validationDetails: validationDetails,
-            failedFields: Object.keys(errors),
-          };
-
-          const err = new Error("Input validation failed");
-          (err as any).details = errors;
-          throw err;
+          logKV("Validation errors", errors);
+          throw Object.assign(new Error("Input validation failed"), {
+            details: errors,
+          });
         }
 
-        // ✅ Validation passed
         vars[step.output || "validated"] = true;
-
-        stepLog.output = {
-          validated: true,
-          validationDetails: validationDetails,
-          summary: `All ${validationDetails.length} validation rule(s) passed`,
-        };
+        logSuccess("inputValidation", Date.now() - stepStart);
       }
 
       // ------------------------------------------------
       // DB FIND
       // ------------------------------------------------
       else if (step.type === "dbFind") {
-        const Model = getModel(step);
-        if (!Model) {
-          throw new Error(`Model not found: ${step.collection}`);
-        }
+        logKV("Collection (raw)", step.collection);
+
+        const collectionName = step.collection;
+        logKV("Collection (used)", collectionName);
+
+        const Model = getModel(collectionName);
+        logKV("Resolved model", Model?.modelName);
 
         const filters = resolveObject(vars, step.filters || {});
+        logKV("Resolved filters", filters);
+
         const result =
           step.findType === "many"
             ? await Model.find(filters)
@@ -192,60 +163,70 @@ export async function runEngine(steps: any[], input: any, headers: any = {}) {
 
         vars[step.output || "found"] = result;
 
-        stepLog.input = {
-          collection: step.collection,
-          findType: step.findType || "one",
-          filters,
-        };
-        stepLog.output = {
-          found: result !== null,
-          count: Array.isArray(result) ? result.length : result ? 1 : 0,
-          data: result,
-        };
+        logKV("Find result", result);
+        logSuccess("dbFind", Date.now() - stepStart);
       }
 
       // ------------------------------------------------
       // DB INSERT
       // ------------------------------------------------
       else if (step.type === "dbInsert") {
-        const Model = getModel(step);
-        if (!Model) {
-          throw new Error(`Model not found: ${step.collection}`);
-        }
+        logKV("Collection (raw)", step.collection);
 
-        const data = resolveObject(vars, step.data || {});
-        const hasPassword = !!data.password;
+        const collectionName = step.collection;
+        logKV("Collection (used)", collectionName);
+
+        const Model = getModel(collectionName);
+        logKV("Resolved model", Model?.modelName);
+
+        const resolved = resolveObject(vars, step.data || {});
+
+        // 🔥 UNWRAP DATA LIKE EXECUTION ENGINE
+        const data =
+          resolved &&
+          typeof resolved === "object" &&
+          "data" in resolved &&
+          typeof resolved.data === "object"
+            ? resolved.data
+            : resolved;
+        logKV("Resolved insert data (before hash)", data);
 
         if (data.password) {
           data.password = await bcrypt.hash(data.password, 10);
         }
 
+        logKV("Final insert data", data);
+
         const created = await Model.create(data);
         vars[step.output || "created"] = created;
 
-        stepLog.input = {
-          collection: step.collection,
-          fields: Object.keys(step.data || {}),
-          hasPassword,
-        };
-        stepLog.output = {
-          success: true,
-          id: created._id || created.id,
-          data: created,
-        };
+        logKV("Created document", created);
+        logSuccess("dbInsert", Date.now() - stepStart);
       }
 
       // ------------------------------------------------
       // DB UPDATE
       // ------------------------------------------------
       else if (step.type === "dbUpdate") {
-        const Model = getModel(step);
-        if (!Model) {
-          throw new Error(`Model not found: ${step.collection}`);
-        }
+        logKV("Collection (raw)", step.collection);
+
+        const Model = getModel(step.collection);
 
         const filter = resolveObject(vars, step.filter || {});
-        const data = resolveObject(vars, step.data || {});
+        const resolved = resolveObject(vars, step.data || {});
+
+        // 🔥 UNWRAP DATA LIKE EXECUTION ENGINE
+        const data =
+          resolved &&
+          typeof resolved === "object" &&
+          "data" in resolved &&
+          typeof resolved.data === "object"
+            ? resolved.data
+            : resolved;
+
+        logKV("Resolved filter", filter);
+        logKV("Resolved update data", data);
+
         const updated = await Model.findOneAndUpdate(
           filter,
           { $set: data },
@@ -253,30 +234,18 @@ export async function runEngine(steps: any[], input: any, headers: any = {}) {
         );
 
         vars[step.output || "updated"] = updated;
+        logKV("Updated document", updated);
 
-        stepLog.input = {
-          collection: step.collection,
-          filter,
-          updateFields: Object.keys(data),
-        };
-        stepLog.output = {
-          success: !!updated,
-          found: !!updated,
-          data: updated,
-        };
+        logSuccess("dbUpdate", Date.now() - stepStart);
       }
 
       // ------------------------------------------------
-      // AUTH MIDDLEWARE
+      // AUTH
       // ------------------------------------------------
       else if (step.type === "authMiddleware") {
-        const auth = headers.authorization || headers.Authorization || null;
+        logKV("Headers received", headers);
 
-        stepLog.input = {
-          hasAuthHeader: !!auth,
-          headerType: auth?.split(" ")[0] || null,
-        };
-
+        const auth = headers.authorization || headers.Authorization;
         if (!auth?.startsWith("Bearer ")) {
           throw new Error("Missing or invalid Authorization header");
         }
@@ -285,100 +254,53 @@ export async function runEngine(steps: any[], input: any, headers: any = {}) {
         const decoded = jwt.verify(token, process.env.JWT_SECRET!);
 
         vars.currentUser = decoded;
-        vars.__auth = decoded;
+        logKV("Decoded JWT", decoded);
 
-        stepLog.output = {
-          authenticated: true,
-          userId: (decoded as any).userId || (decoded as any).id,
-          user: decoded,
-        };
+        logSuccess("authMiddleware", Date.now() - stepStart);
       }
 
       // ------------------------------------------------
-      // EMAIL SEND
+      // EMAIL
       // ------------------------------------------------
       else if (step.type === "emailSend") {
         const to = resolveObject(vars, step.to);
         const subject = resolveObject(vars, step.subject);
         const body = resolveObject(vars, step.body);
 
-        stepLog.input = {
-          to,
-          subject,
-          bodyLength: body?.length || 0,
-        };
+        logKV("Email to", to);
+        logKV("Email subject", subject);
 
-        if (!to || !subject || !body) {
-          throw new Error(
-            "Email resolution failed: missing required fields (to, subject, or body)"
-          );
-        }
-
-        const result = await sendEmail({ to, subject, body });
-        vars[step.output || "emailResult"] = result;
-
-        stepLog.output = {
-          sent: true,
-          recipient: to,
-          result,
-        };
+        await sendEmail({ to, subject, body });
+        logSuccess("emailSend", Date.now() - stepStart);
       }
 
       // ------------------------------------------------
-      // UNKNOWN STEP
+      // UNKNOWN
       // ------------------------------------------------
       else {
-        stepLog.phase = "error";
-        stepLog.error = {
-          message: `Unknown step type: ${step.type}`,
-          availableTypes: [
-            "input",
-            "inputValidation",
-            "dbFind",
-            "dbInsert",
-            "dbUpdate",
-            "authMiddleware",
-            "emailSend",
-          ],
-        };
         throw new Error(`Unknown step type: ${step.type}`);
       }
 
-      stepLog.phase = "step_finished";
-      stepLog.durationMs = Date.now() - stepStart;
       stepResponses.push(stepLog);
     } catch (err: any) {
-      stepLog.phase = "error";
-
-      // Enhanced error logging
-      stepLog.error = stepLog.error || {
-        message: err.message || "Step failed",
-        type: err.name || "Error",
-        stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
-      };
-
-      // Preserve structured validation errors
-      if (err.details) {
-        stepLog.error.validationErrors = err.details;
-      }
-
-      stepLog.durationMs = Date.now() - stepStart;
-      stepResponses.push(stepLog);
+      logError(step.type, err);
+      logKV("Failed step config", step);
+      logKV("Vars at failure", vars);
 
       return {
         ok: false,
         failedStep: index,
         failedStepName: step.name || `${step.type}_${index}`,
-        error:
-          typeof stepLog.error === "string"
-            ? stepLog.error
-            : stepLog.error.message,
-        errorDetails: stepLog.error,
+        error: err.message,
+        errorDetails: err,
         steps: stepResponses,
         totalDurationMs: Date.now() - startedAt,
       };
     }
   }
+
+  logSection("WORKFLOW ENGINE FINISHED");
+  logKV("Final vars", vars);
 
   return {
     ok: true,
