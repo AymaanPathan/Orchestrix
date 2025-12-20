@@ -174,7 +174,7 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
       message: `New record created with ID: ${created._id || "N/A"}`,
       data: created,
       metadata: {
-        insertedId: created._id ,
+        insertedId: created._id,
         collection,
         outputVariable: output || "created",
       },
