@@ -308,35 +308,16 @@ function resolveVariablePath(
   const parts = varPath.split(".");
   const root = parts[0];
 
-  // Check if it's an input variable
+  // INPUT vars → input.email
   if (inputVars.includes(root)) {
     return `input.${varPath}`;
   }
 
-  // Check if root matches an output variable (like "createdRecord", "foundData")
-  // These are UI-facing names that may differ from backend variable names
+  // OUTPUT vars → keep EXACT name
   if (outputVars.includes(root)) {
-    // Map common UI output vars to backend vars
-    const outputVarMap: Record<string, string> = {
-      createdRecord: "created",
-      updatedRecord: "updated",
-      deletedRecord: "deleted",
-      foundData: "foundData",
-      emailResult: "emailResult",
-      validated: "validated",
-      loginResult: "loginResult",
-    };
-
-    const backendVar = outputVarMap[root] || root;
-
-    // If there are nested properties, append them
-    if (parts.length > 1) {
-      return `${backendVar}.${parts.slice(1).join(".")}`;
-    }
-
-    return backendVar;
+    return varPath; // 🔥 DO NOT RENAME
   }
 
-  // Return as-is if no transformation needed
+  // fallback
   return varPath;
 }
