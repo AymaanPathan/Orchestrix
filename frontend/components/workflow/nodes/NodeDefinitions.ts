@@ -63,7 +63,11 @@ export const NodeDefinitions: Record<string, NodeConfig> = {
   // --------------------------------------------------------
   dbInsert: {
     type: "dbInsert",
-    defaultFields: { collection: "", data: {}, outputVar: "createdRecord" },
+    defaultFields: {
+      collection: "",
+      data: {},
+      outputVar: "createdRecord",
+    },
 
     autoMap({ node, connectedInputs, dbSchemas }) {
       const fields = node?.data?.fields;
@@ -88,8 +92,8 @@ export const NodeDefinitions: Record<string, NodeConfig> = {
         id,
         type: "dbInsert",
         collection: node?.data?.fields?.collection,
-        data: node?.data?.fields?.document,
-        output: node?.data?.fields?.outputVar,
+        data: node?.data?.fields?.data,
+        output: node?.data?.fields?.outputVar || "createdRecord",
       };
     },
   },
@@ -126,7 +130,7 @@ export const NodeDefinitions: Record<string, NodeConfig> = {
         collection: node?.data?.fields?.collection,
         findType: node?.data?.fields?.findType,
         filters: node?.data?.fields?.filters,
-        output: node?.data?.fields?.outputVar,
+        output: node?.data?.fields?.outputVar || "foundData",
       };
     },
   },
@@ -173,7 +177,7 @@ export const NodeDefinitions: Record<string, NodeConfig> = {
         updateType: node?.data?.fields?.updateType,
         filters: node?.data?.fields?.filters,
         update: node?.data?.fields?.update,
-        output: node?.data?.fields?.outputVar,
+        output: node?.data?.fields?.outputVar || "updatedRecord",
       };
     },
   },
@@ -211,7 +215,7 @@ export const NodeDefinitions: Record<string, NodeConfig> = {
         collection: node?.data?.fields?.collection,
         deleteType: node?.data?.fields?.deleteType,
         filters: node?.data?.fields?.filters,
-        output: node?.data?.fields?.outputVar,
+        output: node?.data?.fields?.outputVar || "deletedRecord",
       };
     },
   },
@@ -231,6 +235,7 @@ export const NodeDefinitions: Record<string, NodeConfig> = {
       };
     },
   },
+
   // --------------------------------------------------------
   // ⭐ INPUT VALIDATION NODE
   // --------------------------------------------------------
@@ -238,16 +243,15 @@ export const NodeDefinitions: Record<string, NodeConfig> = {
     type: "inputValidation",
 
     defaultFields: {
-      rules: [], // list of { field: string, required: bool, type: string }
+      rules: [],
+      outputVar: "validated",
     },
 
     autoMap({ node, connectedInputs }) {
-      // Auto-map field values based on connected inputs
       const available = collectAvailableVars(connectedInputs);
 
       const fields = node?.data?.fields;
       const newRules = (fields.rules || []).map((r: any) => {
-        // If field points to a known var name → wrap it
         if (available?.includes(r.field)) {
           return { ...r, field: `input.${r.field}` };
         }
@@ -262,71 +266,70 @@ export const NodeDefinitions: Record<string, NodeConfig> = {
         id,
         type: "inputValidation",
         rules: node?.data?.fields?.rules || [],
-        // ❗ inputValidation has no output variable — pass-through only
+        output: node?.data?.fields?.outputVar || "validated",
       };
     },
   },
+
   // --------------------------------------------------------
   // ⭐ USER LOGIN NODE
   // --------------------------------------------------------
   userLogin: {
     type: "userLogin",
 
-    // Default fields for new login nodes
     defaultFields: {
-      email: "input.email",
-      password: "input.password",
+      email: "",
+      password: "",
       outputVar: "loginResult",
     },
 
-    // Auto-map based on connected input nodes
     autoMap({ connectedInputs }) {
       const available = collectAvailableVars(connectedInputs);
 
       return {
-        email: available?.includes("email") ? varWrap("email") : "input.email",
-        password: available?.includes("password")
-          ? varWrap("password")
-          : "input.password",
+        email: available?.includes("email") ? varWrap("email") : "",
+        password: available?.includes("password") ? varWrap("password") : "",
         outputVar: "loginResult",
       };
     },
 
-    // Convert node → backend step format
     toStep(node, id) {
       return {
         id,
         type: "userLogin",
-        email: node?.data?.fields?.email, // "input.email" or "{{email}}"
-        password: node?.data?.fields?.password, // "input.password" or "{{password}}"
-        output: node?.data?.fields?.outputVar, // e.g. loginResult
+        email: node?.data?.fields?.email,
+        password: node?.data?.fields?.password,
+        output: node?.data?.fields?.outputVar || "loginResult",
       };
     },
   },
+
   // --------------------------------------------------------
   // ⭐ AUTH MIDDLEWARE NODE
   // --------------------------------------------------------
   authMiddleware: {
     type: "authMiddleware",
 
-    // No editable fields; backend uses authorization header only
     defaultFields: {},
 
-    // No auto-mapping needed
     autoMap() {
       return {};
     },
 
-    // Minimal step for backend
     toStep(node, id) {
       return {
         id,
         type: "authMiddleware",
-        // No tokenVar, no outputVar, no fields — header only
       };
     },
   },
+
+  // --------------------------------------------------------
+  // ⭐ EMAIL SEND NODE
+  // --------------------------------------------------------
   emailSend: {
+    type: "emailSend",
+
     defaultFields: {
       to: "",
       subject: "",

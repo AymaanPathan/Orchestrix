@@ -33,7 +33,7 @@ export type GraphMeta = {
 };
 
 /* --------------------------------------------------------
-   CLEAN OUTPUT VARIABLE RESOLVER (no duplicates)
+   RESOLVE OUTPUT VARIABLES WITH NESTED FIELDS
 -------------------------------------------------------- */
 function resolveOutputVars(node: any, dbSchemas: Record<string, string[]>) {
   if (!node) return [];
@@ -41,26 +41,76 @@ function resolveOutputVars(node: any, dbSchemas: Record<string, string[]>) {
   const fields = node.data?.fields || {};
   const outVar = fields.outputVar;
 
+  // INPUT NODE: return all variable names
   if (node.type === "input") {
     return (fields.variables || []).map((v: any) => v.name);
   }
 
+  // DB FIND: return base var + all nested schema fields
   if (node.type === "dbFind") {
     const schema = findSchema(fields.collection, dbSchemas);
-    if (!schema) return [outVar];
+    if (!schema || !outVar) return [outVar];
 
     return [outVar, ...schema.map((f) => `${outVar}.${f}`)];
   }
 
-  if (node.type === "dbInsert") return ["createdRecord"];
-  if (node.type === "dbUpdate") return ["updatedRecord"];
-  if (node.type === "dbDelete") return ["deletedRecord"];
+  // DB INSERT: return createdRecord + nested schema fields
+  if (node.type === "dbInsert") {
+    const outputVarName = outVar || "createdRecord";
+    const schema = findSchema(fields.collection, dbSchemas);
+
+    if (!schema) return [outputVarName];
+
+    return [outputVarName, ...schema.map((f) => `${outputVarName}.${f}`)];
+  }
+
+  // DB UPDATE: return updatedRecord + nested schema fields
+  if (node.type === "dbUpdate") {
+    const outputVarName = outVar || "updatedRecord";
+    const schema = findSchema(fields.collection, dbSchemas);
+
+    if (!schema) return [outputVarName];
+
+    return [outputVarName, ...schema.map((f) => `${outputVarName}.${f}`)];
+  }
+
+  // DB DELETE: return deletedRecord + nested schema fields
+  if (node.type === "dbDelete") {
+    const outputVarName = outVar || "deletedRecord";
+    const schema = findSchema(fields.collection, dbSchemas);
+
+    if (!schema) return [outputVarName];
+
+    return [outputVarName, ...schema.map((f) => `${outputVarName}.${f}`)];
+  }
+
+  // EMAIL SEND: simple output
+  if (node.type === "emailSend") {
+    return [outVar || "emailResult"];
+  }
+
+  // INPUT VALIDATION: simple output
+  if (node.type === "inputValidation") {
+    return [outVar || "validated"];
+  }
+
+  // USER LOGIN: return loginResult with nested fields
+  if (node.type === "userLogin") {
+    const outputVarName = outVar || "loginResult";
+    return [
+      outputVarName,
+      `${outputVarName}.ok`,
+      `${outputVarName}.userId`,
+      `${outputVarName}.email`,
+      `${outputVarName}.name`,
+    ];
+  }
 
   return [];
 }
 
 /* --------------------------------------------------------
-   BUILD GRAPH META (WITH STATIC SHAPES)
+   BUILD GRAPH META (WITH PROPER VARIABLE PASSING)
 -------------------------------------------------------- */
 export function buildGraphMeta(
   nodes: any[],
@@ -72,7 +122,7 @@ export function buildGraphMeta(
   const incomingMap = new Map<string, string[]>();
   const outgoingMap = new Map<string, string[]>();
   const inputNodeIds: string[] = [];
-  const staticShapes: Record<string, any> = {}; // ⭐ REQUIRED FIX ⭐
+  const staticShapes: Record<string, any> = {};
 
   nodes.forEach((n) => {
     nodeMap.set(n.id, n);
@@ -88,7 +138,7 @@ export function buildGraphMeta(
   });
 
   /* --------------------------------------------------------
-    ⭐ CREATE STATIC OUTPUT SHAPES FOR ALL NODES
+    CREATE STATIC OUTPUT SHAPES FOR ALL NODES
   -------------------------------------------------------- */
   if (nodeConfigs) {
     nodes.forEach((node) => {
@@ -99,7 +149,7 @@ export function buildGraphMeta(
 
       const shape = cfg.getOutputShape(node.data?.fields || {});
       if (shape) {
-        staticShapes[outVar] = shape; // ⭐ store shape
+        staticShapes[outVar] = shape;
       }
     });
   }
@@ -119,20 +169,23 @@ export function buildGraphMeta(
       const pOutputVars = resolveOutputVars(pNode, dbSchemas);
       const pass = pNode.data?.pass;
 
-      if (pNode.type === "authMiddleware") return; // skip passing
+      // Skip auth middleware nodes
+      if (pNode.type === "authMiddleware") return;
 
       if (!pass || pass === "full") {
-        // full object → pass all vars + all subfields
-        pOutputVars.forEach((v: string) =>
+        // FULL PASS: expose all variables including nested fields
+        pOutputVars.forEach((v: string) => {
           availableVars.push({
             var: v,
             fromNode: pNode.id,
             fromLabel: pNode.data?.label || pNode.type,
             display: `${pNode.data?.label || pNode.type} → ${v}`,
-          })
-        );
+          });
+        });
       } else {
-        // pass specific selected var
+        // SPECIFIC PASS: user selected a specific variable
+
+        // Add the specific selected variable
         availableVars.push({
           var: pass,
           fromNode: pNode.id,
@@ -140,21 +193,23 @@ export function buildGraphMeta(
           display: `${pNode.data?.label || pNode.type} → ${pass}`,
         });
 
-        // ⭐ IMPORTANT FIX:
-        // Even if pass = foundData.email, we still want to expose all subfields
-        const base = pass.split(".")[0]; // example → "foundData"
-        const pNodeFullVars = resolveOutputVars(pNode, dbSchemas);
+        // Extract the base variable name (e.g., "foundData" from "foundData.email")
+        const baseVar = pass.split(".")[0];
 
-        pNodeFullVars
-          .filter((v) => v.startsWith(base + ".")) // only sub-fields
-          .forEach((v) =>
-            availableVars.push({
-              var: v,
-              fromNode: pNode.id,
-              fromLabel: pNode.data?.label || pNode.type,
-              display: `${pNode.data?.label || pNode.type} → ${v}`,
-            })
-          );
+        // If the pass is just the base variable (e.g., "foundData"),
+        // also expose all its nested fields
+        if (pass === baseVar) {
+          pOutputVars
+            .filter((v) => v.startsWith(baseVar + "."))
+            .forEach((v) => {
+              availableVars.push({
+                var: v,
+                fromNode: pNode.id,
+                fromLabel: pNode.data?.label || pNode.type,
+                display: `${pNode.data?.label || pNode.type} → ${v}`,
+              });
+            });
+        }
       }
     });
 
@@ -180,7 +235,7 @@ export function buildGraphMeta(
     outgoingMap,
     inputNodeIds,
     nodeIds: nodes.map((n) => n.id),
-    staticShapes, // ⭐ FIXED
+    staticShapes,
     runtimeShapes: {},
     meta,
   };

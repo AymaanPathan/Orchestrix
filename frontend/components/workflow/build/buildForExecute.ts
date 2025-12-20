@@ -21,6 +21,32 @@ export function buildForExecute(nodes: any[], edges: any[]) {
   });
 
   // --------------------------------------------------
+  // COLLECT ALL OUTPUT VARIABLES FROM ALL NODES
+  // --------------------------------------------------
+  const allOutputVars: string[] = [];
+
+  nodes.forEach((n) => {
+    const fields = n.data?.fields || {};
+
+    // Collect output variables from each node type
+    if (n.type === "dbInsert" && fields.outputVar) {
+      allOutputVars.push(fields.outputVar);
+    } else if (n.type === "dbFind" && fields.outputVar) {
+      allOutputVars.push(fields.outputVar);
+    } else if (n.type === "dbUpdate" && fields.outputVar) {
+      allOutputVars.push(fields.outputVar);
+    } else if (n.type === "dbDelete" && fields.outputVar) {
+      allOutputVars.push(fields.outputVar);
+    } else if (n.type === "emailSend" && fields.outputVar) {
+      allOutputVars.push(fields.outputVar);
+    } else if (n.type === "inputValidation" && fields.outputVar) {
+      allOutputVars.push(fields.outputVar);
+    } else if (n.type === "userLogin" && fields.outputVar) {
+      allOutputVars.push(fields.outputVar);
+    }
+  });
+
+  // --------------------------------------------------
   // BUILD STEPS
   // --------------------------------------------------
   const steps: any[] = [];
@@ -28,7 +54,7 @@ export function buildForExecute(nodes: any[], edges: any[]) {
 
   for (const node of sorted) {
     const raw = node.data?.fields || {};
-    const transformed = transformTemplates(raw, inputVars);
+    const transformed = transformTemplates(raw, inputVars, allOutputVars);
 
     const stepId = `step${counter++}`;
 
@@ -220,19 +246,25 @@ function topologicalSort(nodes: any[], edges: any[]) {
 
 /**
  * Transform template variables in strings
- * Handles BOTH:
+ * Handles:
  * 1. Full templates: "{{email}}" -> "input.email"
  * 2. Partial templates: "hello {{email}}" -> "hello {{input.email}}"
+ * 3. Output variables: "{{createdRecord}}" -> "created" (maps to actual output var)
+ * 4. Nested paths: "{{createdRecord.email}}" -> "created.email"
  */
-function transformTemplates(obj: any, inputVars: string[]): any {
+function transformTemplates(
+  obj: any,
+  inputVars: string[],
+  outputVars: string[]
+): any {
   if (Array.isArray(obj)) {
-    return obj.map((v) => transformTemplates(v, inputVars));
+    return obj.map((v) => transformTemplates(v, inputVars, outputVars));
   }
 
   if (obj && typeof obj === "object") {
     const result: any = {};
     for (const key in obj) {
-      result[key] = transformTemplates(obj[key], inputVars);
+      result[key] = transformTemplates(obj[key], inputVars, outputVars);
     }
     return result;
   }
@@ -242,32 +274,69 @@ function transformTemplates(obj: any, inputVars: string[]): any {
     const fullMatch = obj.match(/^{{\s*([^}]+)\s*}}$/);
     if (fullMatch) {
       const varPath = fullMatch[1].trim();
-      const root = varPath.split(".")[0];
-
-      // If it's an input variable, prefix with "input."
-      if (inputVars.includes(root)) {
-        return `input.${varPath}`;
-      }
-
-      return varPath;
+      return resolveVariablePath(varPath, inputVars, outputVars);
     }
 
     // Handle PARTIAL templates (e.g., "hello {{email}} world")
-    // Replace ALL {{var}} occurrences in the string
     const transformed = obj.replace(/{{\s*([^}]+)\s*}}/g, (match, varPath) => {
-      const trimmed = varPath.trim();
-      const root = trimmed.split(".")[0];
-
-      // If it's an input variable, prefix with "input."
-      if (inputVars.includes(root)) {
-        return `{{input.${trimmed}}}`;
-      }
-
-      return `{{${trimmed}}}`;
+      const resolved = resolveVariablePath(
+        varPath.trim(),
+        inputVars,
+        outputVars
+      );
+      return `{{${resolved}}}`;
     });
 
     return transformed;
   }
 
   return obj;
+}
+
+/**
+ * Resolves a variable path to its actual runtime path
+ * Examples:
+ * - "email" (input var) -> "input.email"
+ * - "createdRecord.email" -> "created.email" (if createdRecord is output var)
+ * - "foundData.name" -> "foundData.name" (direct path)
+ */
+function resolveVariablePath(
+  varPath: string,
+  inputVars: string[],
+  outputVars: string[]
+): string {
+  const parts = varPath.split(".");
+  const root = parts[0];
+
+  // Check if it's an input variable
+  if (inputVars.includes(root)) {
+    return `input.${varPath}`;
+  }
+
+  // Check if root matches an output variable (like "createdRecord", "foundData")
+  // These are UI-facing names that may differ from backend variable names
+  if (outputVars.includes(root)) {
+    // Map common UI output vars to backend vars
+    const outputVarMap: Record<string, string> = {
+      createdRecord: "created",
+      updatedRecord: "updated",
+      deletedRecord: "deleted",
+      foundData: "foundData",
+      emailResult: "emailResult",
+      validated: "validated",
+      loginResult: "loginResult",
+    };
+
+    const backendVar = outputVarMap[root] || root;
+
+    // If there are nested properties, append them
+    if (parts.length > 1) {
+      return `${backendVar}.${parts.slice(1).join(".")}`;
+    }
+
+    return backendVar;
+  }
+
+  // Return as-is if no transformation needed
+  return varPath;
 }
