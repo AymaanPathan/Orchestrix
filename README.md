@@ -414,77 +414,15 @@ Body: { ...your input data }
 ---
 
 ## 📹 Demo Video
-
-![Orchestrix Demo](https://claude.ai/chat/docs/images/video-thumbnail.png)
+https://github.com/user-attachments/assets/cc7e5f2d-8511-41a8-8cb2-fe73fb9cac0e
 
 Watch the full demo showing:
-
 - AI workflow generation
 - Visual editing
 - Real-time execution
 - API deployment
 
----
-
-## 🤝 Contributing
-
-We welcome contributions! Please see [CONTRIBUTING.md](https://claude.ai/chat/CONTRIBUTING.md) for guidelines.
-
-### Development Workflow
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](https://claude.ai/chat/LICENSE) file for details.
-
----
-
-## 🙏 Acknowledgments
-
-- **Motia** - Workflow engine powering Orchestrix
-- **React Flow** - Visual node editor library
-- **shadcn/ui** - Beautiful UI components
-- **Groq** - AI model provider
-
----
-
-## 📞 Support
-
-- 📧 Email: support@orchestrix.dev
-- 💬 Discord: [Join our community](https://claude.ai/chat/YOUR_DISCORD_LINK)
-- 🐛 Issues: [GitHub Issues](https://claude.ai/chat/YOUR_GITHUB_ISSUES_LINK)
-- 📖 Docs: [Full Documentation](https://claude.ai/chat/YOUR_DOCS_LINK)
-
----
-
-## 🗺️ Roadmap
-
-- [ ]  Visual condition/branching logic
-- [ ]  More database connectors (Supabase, Firebase)
-- [ ]  API versioning and rollback
-- [ ]  Workflow templates marketplace
-- [ ]  Team collaboration features
-- [ ]  GraphQL support
-- [ ]  Webhook integrations
-- [ ]  Rate limiting & throttling nodes
-- [ ]  Data transformation studio
-- [ ]  Mobile app for monitoring
-
----
-
-<div align="center">
-
-**Built with ❤️ by the Orchestrix Team**
-
-[Website](https://claude.ai/chat/YOUR_WEBSITE) • [Documentation](https://claude.ai/chat/YOUR_DOCS) • [Twitter](https://claude.ai/chat/YOUR_TWITTER)
-
 ⭐ Star us on GitHub — it helps!
 
 </div>
+
