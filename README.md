@@ -204,7 +204,7 @@ Connect to your existing databases:
 ### Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/orchestrix.git
+git clone https://github.com/AymaanPathan/orchestrix.git
 cd orchestrix
 
 ```
@@ -425,4 +425,5 @@ Watch the full demo showing:
 ⭐ Star us on GitHub — it helps!
 
 </div>
+
 
