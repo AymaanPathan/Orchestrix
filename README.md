@@ -118,11 +118,7 @@ Content-Type: application/json
 ### 🗄️ Database Agnostic
 
 Connect to your existing databases:
-
 - MongoDB
-- PostgreSQL
-- MySQL
-- Or use Orchestrix's built-in storage
 
 ### 🔐 Built-In Security
 
@@ -425,5 +421,6 @@ Watch the full demo showing:
 ⭐ Star us on GitHub — it helps!
 
 </div>
+
 
 
