@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Zap,
   ArrowRight,
@@ -17,23 +17,87 @@ import {
   Activity,
 } from "lucide-react";
 import Link from "next/link";
+import { RootDispatch, RootState } from "@/store";
+import { useDispatch, useSelector } from "react-redux";
+import { fetchDbSchemas } from "@/store/dbSchemasSlice";
+import { AIGenerationScreen } from "@/components/workflow/AIGenerationScreen";
 
 export default function LandingPage() {
-  const [showAIModal, setShowAIModal] = useState(false);
+  const [showGenerationScreen, setShowGenerationScreen] = useState(false);
+  const schemas = useSelector((state: RootState) => state.dbSchemas.schemas);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [showAIModal, setShowAIModal] = useState(false);
+  const dispatch: RootDispatch = useDispatch();
   const [aiPrompt, setAiPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generatingPrompt, setGeneratingPrompt] = useState("");
+  console.log("Schemas in LandingPage:", schemas);
+  const [generationDone, setGenerationDone] = useState(false);
 
-  const handleGenerateClick = () => {
-    if (!aiPrompt.trim()) return;
+  useEffect(() => {
+    dispatch(fetchDbSchemas());
+  }, [dispatch]);
+
+  const generateAIWorkflow = async () => {
+    const prompt = aiPrompt.trim();
+    if (!prompt) return;
+
     setIsGenerating(true);
-    setTimeout(() => {
+
+    try {
+      const res = await fetch("http://localhost:3000/workflow/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      });
+
+      const ai = await res.json();
+
+      if (!ai.nodes || !ai.edges) {
+        throw new Error("Invalid AI workflow returned");
+      }
+
+      sessionStorage.setItem(
+        "aiWorkflow",
+        JSON.stringify({
+          nodes: ai.nodes.map((n, index) => ({
+            id: n.id,
+            type: n.type,
+            position: { x: (index % 3) * 280, y: Math.floor(index / 3) * 180 },
+            data: n.data,
+          })),
+          edges: ai.edges.map((e) => ({
+            id: e.id,
+            source: e.source,
+            target: e.target,
+          })),
+        })
+      );
+
+      setGenerationDone(true); // 🔥 THIS WAS MISSING
+    } finally {
       setIsGenerating(false);
-      setShowAIModal(false);
-      alert("Workflow generated! (Demo)");
-    }, 2000);
+    }
   };
 
+  const handleGenerateClick = async () => {
+    if (!aiPrompt.trim()) return;
+
+    setGeneratingPrompt(aiPrompt);
+    setShowAIModal(false);
+    setShowGenerationScreen(true);
+
+    try {
+      await generateAIWorkflow(); // SINGLE API CALL
+    } catch (e) {
+      handleGenerationError(e);
+    }
+  };
+
+  const handleGenerationComplete = () => {
+    // Redirect to builder page
+    window.location.href = "/builder";
+  };
   const handleKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -43,6 +107,21 @@ export default function LandingPage() {
       setAiPrompt("");
     }
   };
+
+  const handleGenerationError = (error) => {
+    alert("Failed to generate workflow: " + error.message);
+    setShowGenerationScreen(false);
+    setShowAIModal(true);
+  };
+
+  if (showGenerationScreen) {
+    return (
+      <AIGenerationScreen
+        done={generationDone}
+        onComplete={handleGenerationComplete}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-black text-white overflow-hidden relative">

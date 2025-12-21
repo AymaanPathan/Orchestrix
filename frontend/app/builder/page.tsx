@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   useNodesState,
   useEdgesState,
@@ -37,6 +37,7 @@ import { useDispatch, useSelector } from "react-redux";
 import AnimatedDashedEdge from "@/components/Ui/AnimatedDashedEdge";
 import { fetchDbSchemas } from "@/store/dbSchemasSlice";
 import { useExecutionStream } from "@/hooks/useExecutionStream";
+import { ExecutionStreamProvider } from "@/components/ExecutionStreamProvider";
 type ExecutionLog = {
   executionId: string;
   stepIndex: number;
@@ -100,6 +101,21 @@ export default function WorkflowPage() {
     ordered.forEach((n) => (map[n.id] = step++));
     return map;
   }
+
+  // Add this after your other state declarations (around line 75)
+  const handleLogsUpdate = useCallback((logs: ExecutionLog[]) => {
+    setExecution((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        logs,
+        finished: logs.some(
+          (l) =>
+            l.phase === "execution_finished" || l.phase === "execution_failed"
+        ),
+      };
+    });
+  }, []); // Empty deps since we use the functional form of setExecution
 
   // GRAPH META
   useEffect(() => {
@@ -300,23 +316,6 @@ export default function WorkflowPage() {
       setIsSaving(false);
     }
   };
-  const executionId = execution?.executionId ?? null;
-  const streamLogs = useExecutionStream(executionId);
-  useEffect(() => {
-    if (!executionId) return;
-
-    setExecution((prev) => {
-      if (!prev) return prev;
-
-      return {
-        ...prev,
-        logs: streamLogs,
-        finished: streamLogs.some(
-          (l) => l.phase === "end" && l.title.toLowerCase().includes("workflow")
-        ),
-      };
-    });
-  }, [streamLogs, executionId]);
 
   const runWorkflow = async () => {
     try {
@@ -544,6 +543,15 @@ export default function WorkflowPage() {
         isSaving={isSaving}
         savedData={savedWorkflowData}
       />
+
+      {/* Execution Stream Provider - conditionally rendered */}
+      {/* Execution Stream Provider - conditionally rendered */}
+      {execution?.executionId && (
+        <ExecutionStreamProvider
+          executionId={execution.executionId}
+          onUpdate={handleLogsUpdate}
+        />
+      )}
     </div>
   );
 }
