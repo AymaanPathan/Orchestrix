@@ -396,18 +396,6 @@ npm start
 
 ### API Access
 
-After saving a workflow, you get:
-
-```
-Endpoint: https://your-domain.com/api/workflows/{id}/execute
-Method: POST
-Headers: Content-Type: application/json
-Body: { ...your input data }
-
-```
-
----
-
 ## 📹 Demo Video
 https://github.com/user-attachments/assets/cc7e5f2d-8511-41a8-8cb2-fe73fb9cac0e
 
@@ -420,6 +408,7 @@ Watch the full demo showing:
 ⭐ Star us on GitHub — it helps!
 
 </div>
+
 
 
 
