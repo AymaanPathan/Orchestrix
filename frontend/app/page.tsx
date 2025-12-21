@@ -15,7 +15,6 @@ import {
   Eye,
   Boxes,
   Activity,
-  Sparkles,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -182,13 +181,6 @@ export default function LandingPage() {
                 {/* Header */}
                 <div className="px-6 py-5 border-b border-white/[0.06] flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-white/[0.06] border border-white/[0.12] flex items-center justify-center backdrop-blur-xl">
-                      <Sparkles
-                        size={16}
-                        className="text-white/80"
-                        strokeWidth={1.5}
-                      />
-                    </div>
                     <div>
                       <h3 className="text-[15px] font-medium text-white tracking-tight">
                         Generate API Workflow

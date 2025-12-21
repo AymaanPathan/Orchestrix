@@ -83,13 +83,13 @@ export const nodeTemplates = [
   //   icon: <ShieldCheck size={16} />,
   //   color: "orange",
   // },
-  {
-    type: "delay",
-    label: "Delay",
-    description: "Wait for X seconds",
-    icon: <Clock size={16} />,
-    color: "yellow",
-  },
+  // {
+  //   type: "delay",
+  //   label: "Delay",
+  //   description: "Wait for X seconds",
+  //   icon: <Clock size={16} />,
+  //   color: "yellow",
+  // },
   // {
   //   type: "loop",
   //   label: "Loop",

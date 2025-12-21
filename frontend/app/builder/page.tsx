@@ -35,8 +35,8 @@ import { validateGraph } from "@/components/workflow/validation/validateGraph";
 import { RootDispatch, RootState } from "@/store";
 import { useDispatch, useSelector } from "react-redux";
 import AnimatedDashedEdge from "@/components/Ui/AnimatedDashedEdge";
-import { useStreamGroup } from "@motiadev/stream-client-react";
 import { fetchDbSchemas } from "@/store/dbSchemasSlice";
+import { useExecutionStream } from "@/hooks/useExecutionStream";
 type ExecutionLog = {
   executionId: string;
   stepIndex: number;
@@ -301,12 +301,7 @@ export default function WorkflowPage() {
     }
   };
   const executionId = execution?.executionId ?? null;
-
-  const { data: streamLogs } = useStreamGroup<ExecutionLog>({
-    streamName: "executionLog",
-    groupId: executionId ?? undefined,
-  });
-
+  const streamLogs = useExecutionStream(executionId);
   useEffect(() => {
     if (!executionId) return;
 
