@@ -3,7 +3,7 @@
 > "Write backend logic the way you explain it to a friend."
 > 
 
-Orchestrix is a visual backend builder powered by [Motia](https://motia.run/)'s scalable workflows, where anyone — even without coding — can build production-ready APIs, automations, cron jobs, and integrations by simply typing what they want in plain English.
+Orchestrix is a visual backend builder powered by [Motia](https://motia.dev/)'s scalable workflows, where anyone — even without coding — can build production-ready APIs, automations, cron jobs, and integrations by simply typing what they want in plain English.
 
 The system parses English → generates Motia workflow steps → connects nodes → deploys instantly.
 
@@ -420,6 +420,7 @@ Watch the full demo showing:
 ⭐ Star us on GitHub — it helps!
 
 </div>
+
 
 
 
