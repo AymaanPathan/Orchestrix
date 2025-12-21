@@ -6,14 +6,11 @@ import { RootState } from "../../../store";
 import { findSchema } from "../../../utils/findSchemaForCollection.utils";
 import { Plus, Trash2, Filter, Edit3, Shield } from "lucide-react";
 
-/* ---------------------------------------------------
-  Value Selector (string/number/boolean)
---------------------------------------------------- */
 const ValueSelector = ({ value, type, onChange }: any) => {
   if (type === "boolean")
     return (
       <select
-        value={String(value)}
+        value={String(value ?? false)}
         onChange={(e) => onChange(e.target.value === "true")}
         className="bg-black/40 border border-neutral-800 px-3 py-2 rounded-lg text-xs text-white focus:outline-none focus:border-neutral-600 transition-colors"
       >
@@ -27,7 +24,7 @@ const ValueSelector = ({ value, type, onChange }: any) => {
       <input
         type="number"
         className="bg-black/40 border border-neutral-800 px-3 py-2 rounded-lg text-xs text-white focus:outline-none focus:border-neutral-600 transition-colors"
-        value={value}
+        value={value ?? ""}
         onChange={(e) => onChange(Number(e.target.value))}
       />
     );
@@ -35,13 +32,12 @@ const ValueSelector = ({ value, type, onChange }: any) => {
   return (
     <input
       className="bg-black/40 border border-neutral-800 px-3 py-2 rounded-lg text-xs text-white placeholder-neutral-600 focus:outline-none focus:border-neutral-600 transition-colors"
-      value={value}
+      value={value ?? ""}
       onChange={(e) => onChange(e.target.value)}
       placeholder="Enter value..."
     />
   );
 };
-
 /* ---------------------------------------------------
   CLEAN LABELED VAR LIST
 --------------------------------------------------- */

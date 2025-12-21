@@ -1,6 +1,6 @@
 export const schemaPrompt = `
-WORKFLOW JSON SCHEMA (EXACT)
-===========================
+WORKFLOW JSON SCHEMA (STRICT)
+=============================
 
 {
   "nodes": [
@@ -8,7 +8,8 @@ WORKFLOW JSON SCHEMA (EXACT)
       "id": "string",
       "type": "allowed-type",
       "data": {
-        "fields": { }
+        "label": "string",
+        "fields": {}
       }
     }
   ],
@@ -22,12 +23,12 @@ WORKFLOW JSON SCHEMA (EXACT)
 }
 
 =====================================================
-NODE FIELD DEFINITIONS (STRICT)
+NODE FIELD DEFINITIONS
 =====================================================
 
 INPUT
 -----
-fields.variables: Array<{ name: string, type?: string, default?: any }>
+fields.variables: Array<{ name: string, type?: string }>
 
 INPUT VALIDATION
 ----------------
@@ -39,46 +40,42 @@ fields.rules: Array<{
 
 DB FIND
 -------
-fields.collection: string
-fields.findType: "findOne" | "findMany"
-fields.filters: object
-fields.outputVar: string
+fields.collection
+fields.findType
+fields.filters
+fields.outputVar
 
 DB INSERT
 ---------
-fields.collection: string
-fields.data: object
-fields.outputVar: string
-
-❗ MUST use "data" (NOT document)
+fields.collection
+fields.data
+fields.outputVar
 
 DB UPDATE
 ---------
-fields.collection: string
-fields.filters: object
-fields.update: object
-fields.outputVar: string
+fields.collection
+fields.filters
+fields.update
+fields.outputVar
 
 DB DELETE
 ---------
-fields.collection: string
-fields.filters: object
-fields.outputVar: string
+fields.collection
+fields.filters
+fields.outputVar
 
 EMAIL SEND
 ----------
-type MUST be "emailSend"
-
-fields.to: "{{variable}}"
-fields.subject: string
-fields.body: string
-fields.outputVar: string
+fields.to
+fields.subject
+fields.body
+fields.outputVar
 
 USER LOGIN
 ----------
-fields.email: "{{email}}"
-fields.password: "{{password}}"
-fields.outputVar: string
+fields.email
+fields.password
+fields.outputVar
 
 AUTH MIDDLEWARE
 ---------------
@@ -86,52 +83,14 @@ fields: {}
 
 RESPONSE
 --------
-fields.statusCode: number
-fields.body: object
+fields.statusCode
+fields.body
 
 =====================================================
-COMPLETE VALID EXAMPLE
+IMPORTANT
 =====================================================
 
-{
-  "nodes": [
-    {
-      "id": "input_main",
-      "type": "input",
-      "data": {
-        "fields": {
-          "variables": [
-            { "name": "email", "type": "string" },
-            { "name": "password", "type": "string" }
-          ]
-        }
-      }
-    },
-    {
-      "id": "login_user",
-      "type": "userLogin",
-      "data": {
-        "fields": {
-          "email": "{{email}}",
-          "password": "{{password}}",
-          "outputVar": "loginResult"
-        }
-      }
-    },
-    {
-      "id": "response_ok",
-      "type": "response",
-      "data": {
-        "fields": {
-          "statusCode": 200,
-          "body": { "result": "{{loginResult}}" }
-        }
-      }
-    }
-  ],
-  "edges": [
-    { "id": "e1", "source": "input_main", "target": "login_user" },
-    { "id": "e2", "source": "login_user", "target": "response_ok" }
-  ]
-}
+- node.data.label is REQUIRED
+- NEVER omit label
+- NEVER invent fields
 `;

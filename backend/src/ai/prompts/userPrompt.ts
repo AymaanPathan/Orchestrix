@@ -5,22 +5,27 @@ USER REQUEST
 "${userText}"
 
 =====================================================
-YOU MUST GENERATE A WORKFLOW USING ONLY THESE NODE TYPES
+STRICT SCOPE RULE
+=====================================================
+
+Generate ONLY what is required.
+Do NOT add extra steps.
+Do NOT add login, auth, or email unless explicitly requested.
+
+=====================================================
+ALLOWED NODE TYPES
 =====================================================
 
 ${nodeCatalog.map((n) => `- ${n.type}`).join("\n")}
 
 =====================================================
-IMPORTANT REMINDERS
+FINAL RULE
 =====================================================
 
-• Use ONLY allowed node types  
-• Use ONLY {{variable}} syntax  
-• NEVER invent new fields  
-• NEVER use dot notation  
-• Every node MUST include data.fields  
-• Output ONLY valid JSON  
+- Output ONLY valid JSON
+- Every node MUST include data.label
+- Use ONLY {{variable}} syntax
 
-Generate the workflow now.
+Generate the minimal workflow now.
 `;
 }
