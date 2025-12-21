@@ -364,7 +364,6 @@ Orchestrix provides comprehensive debugging tools:
 - Step-by-step replay
 - Export logs as JSON
 
-![Log Viewer](https://claude.ai/chat/docs/images/logs.png)
 
 ---
 
@@ -421,6 +420,7 @@ Watch the full demo showing:
 ⭐ Star us on GitHub — it helps!
 
 </div>
+
 
 
 
