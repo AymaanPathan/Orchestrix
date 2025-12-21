@@ -82,7 +82,7 @@ export function buildForExecute(nodes: any[], edges: any[]) {
         id: stepId,
         type: "inputValidation",
         rules: transformed.rules || [],
-        output: raw.outputVar || "validated",
+        output: raw.outputVar || "validated", // ✅ Use raw.outputVar
         pass: node.data?.pass,
       });
       continue;
@@ -103,7 +103,7 @@ export function buildForExecute(nodes: any[], edges: any[]) {
         to: transformed.to,
         subject: transformed.subject,
         body: transformed.body,
-        output: raw.outputVar || "emailResult",
+        output: raw.outputVar || "emailResult", // ✅ Use raw.outputVar
         pass: node.data?.pass,
       });
 
@@ -114,14 +114,15 @@ export function buildForExecute(nodes: any[], edges: any[]) {
     // DB INSERT
     // --------------------------------------------------
     if (node.type === "dbInsert") {
-      const { collection, output, ...rest } = transformed;
+      // ✅ FIX: Don't destructure 'output' from transformed
+      const { collection, ...rest } = transformed;
 
       steps.push({
         id: stepId,
         type: "dbInsert",
         collection,
         data: rest,
-        output: output || "created",
+        output: raw.outputVar || "created", // ✅ Use raw.outputVar (the user's choice)
         pass: node.data?.pass,
       });
 
@@ -138,7 +139,7 @@ export function buildForExecute(nodes: any[], edges: any[]) {
         collection: transformed.collection,
         filter: transformed.filter || {},
         data: transformed.data || {},
-        output: transformed.output || "updated",
+        output: raw.outputVar || "updated", // ✅ Use raw.outputVar
         pass: node.data?.pass,
       });
       continue;
@@ -154,10 +155,40 @@ export function buildForExecute(nodes: any[], edges: any[]) {
         collection: transformed.collection,
         filters: transformed.filters || {},
         findType: transformed.findType || "findOne",
-        output: raw.outputVar || "foundData",
+        output: raw.outputVar || "foundData", // ✅ Use raw.outputVar
         pass: node.data?.pass,
       });
 
+      continue;
+    }
+
+    // --------------------------------------------------
+    // DB DELETE
+    // --------------------------------------------------
+    if (node.type === "dbDelete") {
+      steps.push({
+        id: stepId,
+        type: "dbDelete",
+        collection: transformed.collection,
+        filter: transformed.filter || {},
+        output: raw.outputVar || "deleted", // ✅ Use raw.outputVar
+        pass: node.data?.pass,
+      });
+      continue;
+    }
+
+    // --------------------------------------------------
+    // USER LOGIN
+    // --------------------------------------------------
+    if (node.type === "userLogin") {
+      steps.push({
+        id: stepId,
+        type: "userLogin",
+        email: transformed.email,
+        password: transformed.password,
+        output: raw.outputVar || "loginResult", // ✅ Use raw.outputVar
+        pass: node.data?.pass,
+      });
       continue;
     }
   }
@@ -250,8 +281,8 @@ function topologicalSort(nodes: any[], edges: any[]) {
  * Handles:
  * 1. Full templates: "{{email}}" -> "input.email"
  * 2. Partial templates: "hello {{email}}" -> "hello {{input.email}}"
- * 3. Output variables: "{{createdRecord}}" -> "created" (maps to actual output var)
- * 4. Nested paths: "{{createdRecord.email}}" -> "created.email"
+ * 3. Output variables: "{{createdRecord}}" -> "createdRecord" (kept as-is)
+ * 4. Nested paths: "{{createdRecord.email}}" -> "createdRecord.email" (kept as-is)
  */
 function transformTemplates(
   obj: any,
@@ -298,8 +329,9 @@ function transformTemplates(
  * Resolves a variable path to its actual runtime path
  * Examples:
  * - "email" (input var) -> "input.email"
- * - "createdRecord.email" -> "created.email" (if createdRecord is output var)
- * - "foundData.name" -> "foundData.name" (direct path)
+ * - "createdRecord" (output var) -> "createdRecord" (kept as-is)
+ * - "createdRecord.email" -> "createdRecord.email" (kept as-is)
+ * - "foundData.name" -> "foundData.name" (kept as-is)
  */
 function resolveVariablePath(
   varPath: string,
@@ -314,9 +346,9 @@ function resolveVariablePath(
     return `input.${varPath}`;
   }
 
-  // OUTPUT vars → keep EXACT name
+  // OUTPUT vars → keep EXACT name (the runtime will handle it)
   if (outputVars.includes(root)) {
-    return varPath; // 🔥 DO NOT RENAME
+    return varPath;
   }
 
   // fallback
