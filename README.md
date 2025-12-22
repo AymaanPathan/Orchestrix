@@ -1,5 +1,5 @@
 # 🎯 Orchestrix
-<img width="3780" height="1890" alt="thumbnail" src="https://github.com/user-attachments/assets/98550901-ecd8-42b1-b499-5742c122962e" />
+<img width="3780" height="1890" alt="thumbnail" src="https://github.com/user-attachments/assets/4b0870fd-2e33-466e-a377-4e23472be421" />
 
 > "Write backend logic the way you explain it to a friend."
 > 
@@ -409,6 +409,7 @@ Watch the full demo showing:
 ⭐ Star us on GitHub — it helps!
 
 </div>
+
 
 
 
