@@ -1,6 +1,8 @@
+/* eslint-disable react/no-unescaped-entities */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   Zap,
   ArrowRight,
@@ -15,66 +17,253 @@ import {
   Eye,
   Boxes,
   Activity,
+  Shield,
+  AlertCircle,
+  Loader2,
+  ChevronRight,
+  Server,
+  Table2,
+  Clock,
+  Unplug,
 } from "lucide-react";
 import Link from "next/link";
 import { RootDispatch, RootState } from "@/store";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchDbSchemas } from "@/store/dbSchemasSlice";
+import {
+  fetchDbSchemas,
+  setUserDbConnected,
+  clearDbSchemas,
+} from "@/store/dbSchemasSlice";
 import { AIGenerationScreen } from "@/components/workflow/AIGenerationScreen";
 
+// ── DB Connection types ───────────────────────────────────────────────────────
+
+type ConnectPhase =
+  | "idle"
+  | "connecting"
+  | "authenticating"
+  | "fetching_schemas"
+  | "done"
+  | "error";
+
+const CONNECT_PHASES: { phase: ConnectPhase; label: string; sub: string }[] = [
+  {
+    phase: "connecting",
+    label: "Connecting",
+    sub: "Reaching your database server...",
+  },
+  {
+    phase: "authenticating",
+    label: "Authenticating",
+    sub: "Verifying credentials...",
+  },
+  {
+    phase: "fetching_schemas",
+    label: "Reading schemas",
+    sub: "Discovering your collections...",
+  },
+  { phase: "done", label: "Connected", sub: "Your database is ready." },
+];
+
+// ── Landing Page ──────────────────────────────────────────────────────────────
+
 export default function LandingPage() {
-  const [showGenerationScreen, setShowGenerationScreen] = useState(false);
-  const schemas = useSelector((state: RootState) => state.dbSchemas.schemas);
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [showAIModal, setShowAIModal] = useState(false);
   const dispatch: RootDispatch = useDispatch();
+  const schemas = useSelector((state: RootState) => state.dbSchemas.schemas);
+  const isConnected = useSelector(
+    (state: RootState) => state.dbSchemas.isUserDbConnected,
+  );
+  const dbLabel = useSelector(
+    (state: RootState) => state.dbSchemas.userDbLabel,
+  );
+  const uriMasked = useSelector(
+    (state: RootState) => state.dbSchemas.userDbUriMasked,
+  );
+  const ownerId = useSelector((state: RootState) => state.dbSchemas.ownerId);
+
+  // ── UI state ─────────────────────────────────────────────────────────────
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  // Step 1: DB connect modal
+  const [showDbModal, setShowDbModal] = useState(false);
+  const [dbUri, setDbUri] = useState("");
+  const [dbLabelInput, setDbLabelInput] = useState("");
+  const [connectPhase, setConnectPhase] = useState<ConnectPhase>("idle");
+  const [completedPhases, setCompletedPhases] = useState<ConnectPhase[]>([]);
+  const [connectError, setConnectError] = useState("");
+  const [freshSchemas, setFreshSchemas] = useState<Record<string, string[]>>(
+    {},
+  );
+  const uriInputRef = useRef<HTMLInputElement>(null);
+
+  // Step 2: DB info confirm modal
+  const [showDbInfoModal, setShowDbInfoModal] = useState(false);
+  // What the user wanted to do next (stored while we gate them)
+  const [pendingAction, setPendingAction] = useState<"ai" | "manual" | null>(
+    null,
+  );
+
+  // AI generation
+  const [showAIModal, setShowAIModal] = useState(false);
   const [aiPrompt, setAiPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generatingPrompt, setGeneratingPrompt] = useState("");
-  console.log("Schemas in LandingPage:", schemas);
+  const [showGenerationScreen, setShowGenerationScreen] = useState(false);
   const [generationDone, setGenerationDone] = useState(false);
 
   useEffect(() => {
     dispatch(fetchDbSchemas());
   }, [dispatch]);
 
+  useEffect(() => {
+    if (showDbModal && connectPhase === "idle") {
+      setTimeout(() => uriInputRef.current?.focus(), 60);
+    }
+  }, [showDbModal, connectPhase]);
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
+  function sleep(ms: number) {
+    return new Promise((r) => setTimeout(r, ms));
+  }
+
+  /** Gate: if already connected skip straight to action, else show DB modal */
+  function requireDb(action: "ai" | "manual") {
+    if (isConnected) {
+      // Already connected — show info confirmation modal
+      setPendingAction(action);
+      setShowDbInfoModal(true);
+    } else {
+      setPendingAction(action);
+      setShowDbModal(true);
+    }
+  }
+
+  /** After user confirms DB info, proceed with their intended action */
+  function proceedWithAction() {
+    setShowDbInfoModal(false);
+    if (pendingAction === "ai") {
+      setShowAIModal(true);
+    } else if (pendingAction === "manual") {
+      window.location.href = "/builder";
+    }
+    setPendingAction(null);
+  }
+
+  // ── DB Connection flow ────────────────────────────────────────────────────
+
+  async function handleConnect() {
+    if (!dbUri.trim()) return;
+    setConnectPhase("connecting");
+    setCompletedPhases([]);
+    setConnectError("");
+
+    try {
+      const res = await fetch("http://localhost:3000/user/db/connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ownerId,
+          uri: dbUri.trim(),
+          label: dbLabelInput.trim() || "My Database",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok)
+        throw new Error(data.detail || data.error || "Connection failed");
+
+      await sleep(700);
+      setConnectPhase("authenticating");
+      setCompletedPhases(["connecting"]);
+
+      await sleep(700);
+      setConnectPhase("fetching_schemas");
+      setCompletedPhases(["connecting", "authenticating"]);
+
+      const schemaRes = await fetch(
+        `http://localhost:3000/user/db/schemas?ownerId=${ownerId}`,
+      );
+      const schemaData = await schemaRes.json();
+      const schemas = schemaData.schemas || {};
+
+      await sleep(500);
+      setConnectPhase("done");
+      setCompletedPhases([
+        "connecting",
+        "authenticating",
+        "fetching_schemas",
+        "done",
+      ]);
+      setFreshSchemas(schemas);
+
+      // Persist to Redux
+      dispatch(
+        setUserDbConnected({
+          schemas,
+          label: dbLabelInput.trim() || "My Database",
+          uriMasked: data.uriMasked,
+        }),
+      );
+
+      await sleep(900);
+
+      // Close DB modal, open info modal
+      setShowDbModal(false);
+      setConnectPhase("idle");
+      setDbUri("");
+      setDbLabelInput("");
+      setCompletedPhases([]);
+      setShowDbInfoModal(true);
+    } catch (err: any) {
+      setConnectPhase("error");
+      setConnectError(
+        err.message || "Could not connect. Check your URI and try again.",
+      );
+    }
+  }
+
+  async function handleDisconnect() {
+    await fetch("http://localhost:3000/user/db/disconnect", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ownerId }),
+    });
+    dispatch(clearDbSchemas());
+  }
+
+  // ── AI Generation ─────────────────────────────────────────────────────────
+
   const generateAIWorkflow = async () => {
     const prompt = aiPrompt.trim();
     if (!prompt) return;
-
     setIsGenerating(true);
-
     try {
       const res = await fetch("http://localhost:3000/workflow/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt }),
       });
-
       const ai = await res.json();
-
-      if (!ai.nodes || !ai.edges) {
+      if (!ai.nodes || !ai.edges)
         throw new Error("Invalid AI workflow returned");
-      }
 
       sessionStorage.setItem(
         "aiWorkflow",
         JSON.stringify({
-          nodes: ai.nodes.map((n, index) => ({
+          nodes: ai.nodes.map((n: any, index: number) => ({
             id: n.id,
             type: n.type,
             position: { x: (index % 3) * 280, y: Math.floor(index / 3) * 180 },
             data: n.data,
           })),
-          edges: ai.edges.map((e) => ({
+          edges: ai.edges.map((e: any) => ({
             id: e.id,
             source: e.source,
             target: e.target,
           })),
-        })
+        }),
       );
 
-      setGenerationDone(true); // 🔥 THIS WAS MISSING
+      setGenerationDone(true);
     } finally {
       setIsGenerating(false);
     }
@@ -82,23 +271,18 @@ export default function LandingPage() {
 
   const handleGenerateClick = async () => {
     if (!aiPrompt.trim()) return;
-
-    setGeneratingPrompt(aiPrompt);
     setShowAIModal(false);
     setShowGenerationScreen(true);
-
     try {
-      await generateAIWorkflow(); // SINGLE API CALL
-    } catch (e) {
-      handleGenerationError(e);
+      await generateAIWorkflow();
+    } catch (e: any) {
+      alert("Failed to generate workflow: " + e.message);
+      setShowGenerationScreen(false);
+      setShowAIModal(true);
     }
   };
 
-  const handleGenerationComplete = () => {
-    // Redirect to builder page
-    window.location.href = "/builder";
-  };
-  const handleKeyDown = (e) => {
+  const handleAiKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleGenerateClick();
@@ -108,41 +292,44 @@ export default function LandingPage() {
     }
   };
 
-  const handleGenerationError = (error) => {
-    alert("Failed to generate workflow: " + error.message);
-    setShowGenerationScreen(false);
-    setShowAIModal(true);
-  };
+  const isConnecting =
+    connectPhase !== "idle" &&
+    connectPhase !== "done" &&
+    connectPhase !== "error";
+  const collectionCount = Object.keys(
+    isConnected ? schemas : freshSchemas,
+  ).length;
+
+  // ── Render ────────────────────────────────────────────────────────────────
 
   if (showGenerationScreen) {
     return (
       <AIGenerationScreen
         done={generationDone}
-        onComplete={handleGenerationComplete}
+        onComplete={() => {
+          window.location.href = "/builder";
+        }}
       />
     );
   }
 
   return (
     <div className="min-h-screen bg-black text-white overflow-hidden relative">
-      {/* Subtle Grid Background */}
+      {/* Grid */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none opacity-[0.03]">
         <div
           className="absolute inset-0"
           style={{
-            backgroundImage: `linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px),
-                             linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)`,
+            backgroundImage: `linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)`,
             backgroundSize: "80px 80px",
           }}
         />
       </div>
-
-      {/* Noise Texture */}
       <div className="fixed inset-0 opacity-[0.02] pointer-events-none mix-blend-overlay">
         <div className="absolute inset-0 bg-noise" />
       </div>
 
-      {/* Navigation */}
+      {/* Nav */}
       <nav className="fixed top-0 left-0 right-0 z-50 animate-slide-down">
         <div className="absolute inset-0 bg-black/60 backdrop-blur-2xl border-b border-white/[0.06]" />
         <div className="relative max-w-7xl mx-auto px-6 lg:px-8">
@@ -155,6 +342,30 @@ export default function LandingPage() {
                 Orchestrix
               </span>
             </div>
+
+            {/* DB status pill in nav */}
+            {isConnected && (
+              <button
+                onClick={() => {
+                  setPendingAction(null);
+                  setShowDbInfoModal(true);
+                }}
+                className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.07] rounded-lg transition-all duration-200 group"
+              >
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white/40 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white/60" />
+                </span>
+                <Database
+                  size={13}
+                  strokeWidth={1.5}
+                  className="text-white/50"
+                />
+                <span className="text-[12px] text-white/50 max-w-[120px] truncate">
+                  {dbLabel}
+                </span>
+              </button>
+            )}
 
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -170,23 +381,13 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      {/* Hero Section */}
+      {/* Hero */}
       <section className="relative min-h-screen flex items-center justify-center px-6 pt-20">
-        {/* Radial Gradient Spotlight */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-white/[0.03] rounded-full blur-[120px]" />
         </div>
 
-        <div className="relative z-10 max-w-5xl mx-auto text-center animate-fade-in-up">
-          {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.04] border border-white/[0.08] backdrop-blur-xl mb-8 animate-fade-in">
-            <div className="w-1 h-1 rounded-full bg-white/60 animate-pulse-subtle" />
-            <span className="text-[12px] font-medium text-white/60 tracking-wide">
-              AI-POWERED API GENERATION
-            </span>
-          </div>
-
-          {/* Heading */}
+        <div className="relative text-center animate-fade-in-up">
           <h1 className="text-5xl sm:text-6xl lg:text-[76px] font-semibold mb-6 leading-[1.06] tracking-[-0.02em]">
             <span className="inline-block animate-fade-in-up">
               Build APIs without
@@ -197,16 +398,15 @@ export default function LandingPage() {
             </span>
           </h1>
 
-          {/* Subtitle */}
           <p className="text-lg sm:text-xl text-white/40 mb-12 max-w-2xl mx-auto leading-relaxed font-light animate-fade-in-up animation-delay-200">
             Connect nodes, define logic, and deploy production-ready APIs
             instantly. Let AI generate workflows or build manually.
           </p>
 
-          {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 animate-fade-in-up animation-delay-300">
+            {/* Generate with AI — gates on DB */}
             <button
-              onClick={() => setShowAIModal(true)}
+              onClick={() => requireDb("ai")}
               className="group px-6 py-3 text-[14px] font-medium text-black bg-white hover:bg-white/90 rounded-lg w-full sm:w-auto justify-center transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] shadow-[0_0_40px_rgba(255,255,255,0.1)]"
             >
               <span className="flex items-center gap-2">
@@ -220,16 +420,17 @@ export default function LandingPage() {
               </span>
             </button>
 
-            <Link href="/builder" passHref>
-              <button className="group px-6 py-3 text-[14px] font-medium text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] rounded-lg backdrop-blur-xl flex items-center gap-2 transition-all duration-300 w-full sm:w-auto justify-center hover:scale-[1.02] active:scale-[0.98]">
-                <Play size={18} strokeWidth={2} />
-                Build Manually
-              </button>
-            </Link>
+            {/* Build Manually — also gates on DB */}
+            <button
+              onClick={() => requireDb("manual")}
+              className="group px-6 py-3 text-[14px] font-medium text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] rounded-lg backdrop-blur-xl flex items-center gap-2 transition-all duration-300 w-full sm:w-auto justify-center hover:scale-[1.02] active:scale-[0.98]"
+            >
+              <Play size={18} strokeWidth={2} />
+              Build Manually
+            </button>
           </div>
         </div>
 
-        {/* Scroll Indicator */}
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-fade-in animation-delay-500">
           <div className="w-5 h-9 rounded-full border border-white/[0.12] flex items-start justify-center p-1.5 backdrop-blur-xl bg-white/[0.02]">
             <div className="w-0.5 h-2 bg-white/40 rounded-full animate-scroll" />
@@ -237,7 +438,399 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* AI Modal */}
+      {/* ── STEP 1: DB Connect Modal ─────────────────────────────────────────── */}
+      {showDbModal && (
+        <>
+          <div
+            onClick={() => {
+              if (!isConnecting) {
+                setShowDbModal(false);
+                setConnectPhase("idle");
+                setConnectError("");
+              }
+            }}
+            className="fixed inset-0 bg-black/80 backdrop-blur-xl z-[100] animate-lp-fade"
+          />
+          <div className="fixed inset-0 z-[101] flex items-center justify-center p-4 animate-lp-modal">
+            <div className="relative w-full max-w-lg">
+              <div className="absolute inset-0 bg-white/[0.02] rounded-2xl blur-3xl" />
+              <div className="relative bg-[#090909]/98 border border-white/[0.1] rounded-2xl shadow-2xl backdrop-blur-2xl overflow-hidden">
+                <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-white/[0.15] to-transparent" />
+
+                {/* Header */}
+                <div className="px-6 py-5 border-b border-white/[0.05] flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-white/[0.05] border border-white/[0.08] flex items-center justify-center">
+                      <Database
+                        size={15}
+                        strokeWidth={1.5}
+                        className="text-white/70"
+                      />
+                    </div>
+                    <div>
+                      <h3 className="text-[14px] font-medium text-white tracking-tight">
+                        Connect your database
+                      </h3>
+                      <p className="text-[12px] text-white/30 font-light mt-0.5">
+                        Required before building your API
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (!isConnecting) {
+                        setShowDbModal(false);
+                        setConnectPhase("idle");
+                        setConnectError("");
+                      }
+                    }}
+                    disabled={isConnecting}
+                    className="p-1.5 hover:bg-white/[0.06] rounded-lg transition-all duration-200 disabled:opacity-30"
+                  >
+                    <X size={15} className="text-white/40" strokeWidth={1.5} />
+                  </button>
+                </div>
+
+                <div className="p-6">
+                  {connectPhase === "idle" || connectPhase === "error" ? (
+                    <div className="space-y-4">
+                      {/* Label */}
+                      <div>
+                        <label className="block text-[11px] text-white/30 mb-2 tracking-wider uppercase font-medium">
+                          Connection label
+                        </label>
+                        <input
+                          type="text"
+                          value={dbLabelInput}
+                          onChange={(e) => setDbLabelInput(e.target.value)}
+                          placeholder="My Production DB"
+                          className="w-full px-3.5 py-2.5 bg-white/[0.03] border border-white/[0.07] hover:border-white/[0.11] rounded-lg text-[13px] text-white placeholder-white/20 focus:outline-none focus:border-white/[0.16] transition-all duration-200"
+                        />
+                      </div>
+                      {/* URI */}
+                      <div>
+                        <label className="block text-[11px] text-white/30 mb-2 tracking-wider uppercase font-medium">
+                          MongoDB URI
+                        </label>
+                        <input
+                          ref={uriInputRef}
+                          type="text"
+                          value={dbUri}
+                          onChange={(e) => setDbUri(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleConnect();
+                          }}
+                          placeholder="mongodb+srv://user:pass@cluster.mongodb.net/db"
+                          spellCheck={false}
+                          className="w-full px-3.5 py-2.5 bg-white/[0.03] border border-white/[0.07] hover:border-white/[0.11] rounded-lg text-[13px] text-white placeholder-white/20 font-mono focus:outline-none focus:border-white/[0.16] transition-all duration-200"
+                        />
+                      </div>
+
+                      {connectError && (
+                        <div className="flex items-start gap-2.5 px-3.5 py-3 bg-red-500/[0.06] border border-red-500/[0.12] rounded-lg animate-lp-fade">
+                          <AlertCircle
+                            size={14}
+                            className="text-red-400/80 mt-0.5 shrink-0"
+                            strokeWidth={1.5}
+                          />
+                          <p className="text-[12px] text-red-400/80 leading-relaxed">
+                            {connectError}
+                          </p>
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-1.5 text-[11px] text-white/20 px-0.5">
+                        <Zap size={10} strokeWidth={1.5} />
+                        <span>We'll verify the connection before saving</span>
+                        <span className="ml-auto flex items-center gap-1.5">
+                          <kbd className="px-1.5 py-0.5 bg-white/[0.04] border border-white/[0.07] rounded text-[10px] font-mono">
+                            ⏎
+                          </kbd>
+                          to connect
+                        </span>
+                      </div>
+
+                      <div className="flex gap-2.5 pt-1">
+                        <button
+                          onClick={() => {
+                            setShowDbModal(false);
+                            setConnectPhase("idle");
+                            setConnectError("");
+                          }}
+                          className="flex-1 px-4 py-2.5 text-[13px] text-white/40 hover:text-white/70 bg-white/[0.02] hover:bg-white/[0.05] border border-white/[0.07] rounded-lg transition-all duration-200"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleConnect}
+                          disabled={!dbUri.trim()}
+                          className="flex-1 px-4 py-2.5 text-[13px] font-medium text-black bg-white hover:bg-white/90 rounded-lg flex items-center justify-center gap-2 transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed shadow-[0_0_24px_rgba(255,255,255,0.08)]"
+                        >
+                          <Database size={14} strokeWidth={2} />
+                          Connect
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Connecting animation */
+                    <div className="py-4">
+                      <div className="text-center mb-8">
+                        <div className="relative inline-flex items-center justify-center w-14 h-14 mb-4">
+                          {connectPhase !== "done" && (
+                            <div className="absolute inset-0 rounded-full bg-white/[0.04] animate-lp-ping" />
+                          )}
+                          <div className="relative w-14 h-14 rounded-full bg-white/[0.05] border border-white/[0.1] flex items-center justify-center">
+                            {connectPhase === "done" ? (
+                              <CheckCircle
+                                size={22}
+                                className="text-white/80"
+                                strokeWidth={1.5}
+                              />
+                            ) : (
+                              <Loader2
+                                size={20}
+                                className="text-white/60 animate-spin"
+                                strokeWidth={1.5}
+                              />
+                            )}
+                          </div>
+                        </div>
+                        <p className="text-[15px] font-medium text-white tracking-tight">
+                          {
+                            CONNECT_PHASES.find((p) => p.phase === connectPhase)
+                              ?.label
+                          }
+                        </p>
+                        <p className="text-[12px] text-white/30 mt-1 font-light">
+                          {
+                            CONNECT_PHASES.find((p) => p.phase === connectPhase)
+                              ?.sub
+                          }
+                        </p>
+                      </div>
+
+                      <div className="space-y-1">
+                        {CONNECT_PHASES.filter((p) => p.phase !== "done").map(
+                          (p, i) => {
+                            const done = completedPhases.includes(p.phase);
+                            const current = connectPhase === p.phase;
+                            return (
+                              <div
+                                key={p.phase}
+                                className={`flex items-center gap-3 px-3.5 py-2.5 rounded-lg transition-all duration-500 ${current ? "bg-white/[0.04] border border-white/[0.07]" : done ? "" : "opacity-30"}`}
+                                style={{ transitionDelay: `${i * 40}ms` }}
+                              >
+                                <div className="shrink-0 w-5 h-5 flex items-center justify-center">
+                                  {done ? (
+                                    <CheckCircle
+                                      size={14}
+                                      className="text-white/50"
+                                      strokeWidth={1.5}
+                                    />
+                                  ) : current ? (
+                                    <Loader2
+                                      size={13}
+                                      className="text-white/60 animate-spin"
+                                      strokeWidth={1.5}
+                                    />
+                                  ) : (
+                                    <div className="w-1.5 h-1.5 rounded-full bg-white/20" />
+                                  )}
+                                </div>
+                                <span
+                                  className={`text-[12px] transition-colors duration-300 ${done ? "text-white/50" : current ? "text-white/80" : "text-white/20"}`}
+                                >
+                                  {p.label}
+                                </span>
+                                {current && (
+                                  <span className="ml-auto text-[10px] text-white/20 font-light">
+                                    {p.sub}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          },
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {(connectPhase === "idle" || connectPhase === "error") && (
+                  <div className="px-6 pb-5">
+                    <div className="flex items-center gap-2 text-[11px] text-white/20 font-light">
+                      <Shield size={11} strokeWidth={1.5} />
+                      <span>
+                        URI encrypted with AES-256 — never logged or shared
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── STEP 2: DB Info Confirm Modal ─────────────────────────────────────── */}
+      {showDbInfoModal && (
+        <>
+          <div
+            onClick={() => {
+              setShowDbInfoModal(false);
+              setPendingAction(null);
+            }}
+            className="fixed inset-0 bg-black/80 backdrop-blur-xl z-[100] animate-lp-fade"
+          />
+          <div className="fixed inset-0 z-[101] flex items-center justify-center p-4 animate-lp-modal">
+            <div className="relative w-full max-w-md">
+              <div className="absolute inset-0 bg-white/[0.02] rounded-2xl blur-3xl" />
+              <div className="relative bg-[#090909]/98 border border-white/[0.1] rounded-2xl shadow-2xl backdrop-blur-2xl overflow-hidden">
+                <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-white/[0.15] to-transparent" />
+
+                {/* Header */}
+                <div className="px-6 py-5 border-b border-white/[0.05] flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-white/[0.05] border border-white/[0.08] flex items-center justify-center">
+                      <CheckCircle
+                        size={15}
+                        strokeWidth={1.5}
+                        className="text-white/70"
+                      />
+                    </div>
+                    <div>
+                      <h3 className="text-[14px] font-medium text-white tracking-tight">
+                        Database connected
+                      </h3>
+                      <p className="text-[12px] text-white/30 font-light mt-0.5">
+                        Review your connection before continuing
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setShowDbInfoModal(false);
+                      setPendingAction(null);
+                    }}
+                    className="p-1.5 hover:bg-white/[0.06] rounded-lg transition-all duration-200"
+                  >
+                    <X size={15} className="text-white/40" strokeWidth={1.5} />
+                  </button>
+                </div>
+
+                {/* DB Info cards */}
+                <div className="p-6 space-y-3">
+                  {/* Label + URI row */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3.5 bg-white/[0.02] border border-white/[0.06] rounded-xl space-y-1.5">
+                      <div className="flex items-center gap-1.5 text-[10px] text-white/30 uppercase tracking-wider font-medium">
+                        <Server size={10} strokeWidth={1.5} />
+                        Label
+                      </div>
+                      <p className="text-[13px] text-white/80 font-medium truncate">
+                        {dbLabel || "My Database"}
+                      </p>
+                    </div>
+                    <div className="p-3.5 bg-white/[0.02] border border-white/[0.06] rounded-xl space-y-1.5">
+                      <div className="flex items-center gap-1.5 text-[10px] text-white/30 uppercase tracking-wider font-medium">
+                        <Table2 size={10} strokeWidth={1.5} />
+                        Collections
+                      </div>
+                      <p className="text-[13px] text-white/80 font-medium">
+                        {collectionCount} found
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Masked URI */}
+                  {uriMasked && (
+                    <div className="p-3.5 bg-white/[0.02] border border-white/[0.06] rounded-xl space-y-1.5">
+                      <div className="flex items-center gap-1.5 text-[10px] text-white/30 uppercase tracking-wider font-medium">
+                        <Database size={10} strokeWidth={1.5} />
+                        Connection
+                      </div>
+                      <p className="text-[11px] text-white/50 font-mono truncate">
+                        {uriMasked}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Collection list */}
+                  {collectionCount > 0 && (
+                    <div className="p-3.5 bg-white/[0.02] border border-white/[0.06] rounded-xl space-y-2">
+                      <div className="flex items-center gap-1.5 text-[10px] text-white/30 uppercase tracking-wider font-medium">
+                        <Table2 size={10} strokeWidth={1.5} />
+                        Discovered collections
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {Object.keys(schemas)
+                          .slice(0, 8)
+                          .map((col) => (
+                            <span
+                              key={col}
+                              className="px-2 py-1 bg-white/[0.04] border border-white/[0.07] rounded-md text-[11px] text-white/60 font-mono"
+                            >
+                              {col}
+                            </span>
+                          ))}
+                        {Object.keys(schemas).length > 8 && (
+                          <span className="px-2 py-1 text-[11px] text-white/30">
+                            +{Object.keys(schemas).length - 8} more
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Actions */}
+                  <div className="flex gap-2.5 pt-1">
+                    <button
+                      onClick={() => {
+                        setShowDbInfoModal(false);
+                        handleDisconnect();
+                        setPendingAction(null);
+                      }}
+                      className="flex items-center gap-1.5 px-3.5 py-2.5 text-[12px] text-white/30 hover:text-white/60 bg-white/[0.02] hover:bg-white/[0.05] border border-white/[0.06] rounded-lg transition-all duration-200"
+                    >
+                      <Unplug size={13} strokeWidth={1.5} />
+                      Disconnect
+                    </button>
+
+                    {pendingAction && (
+                      <button
+                        onClick={proceedWithAction}
+                        className="flex-1 px-4 py-2.5 text-[13px] font-medium text-black bg-white hover:bg-white/90 rounded-lg flex items-center justify-center gap-2 transition-all duration-200 shadow-[0_0_24px_rgba(255,255,255,0.08)]"
+                      >
+                        {pendingAction === "ai" ? (
+                          <>
+                            <Brain size={14} strokeWidth={2} /> Continue with AI
+                          </>
+                        ) : (
+                          <>
+                            <Play size={14} strokeWidth={2} /> Open Builder
+                          </>
+                        )}
+                        <ArrowRight size={14} strokeWidth={2} />
+                      </button>
+                    )}
+
+                    {!pendingAction && (
+                      <button
+                        onClick={() => setShowDbInfoModal(false)}
+                        className="flex-1 px-4 py-2.5 text-[13px] font-medium text-white/70 hover:text-white bg-white/[0.04] hover:bg-white/[0.07] border border-white/[0.08] rounded-lg transition-all duration-200"
+                      >
+                        Close
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── AI Prompt Modal ───────────────────────────────────────────────────── */}
       {showAIModal && (
         <>
           <div
@@ -245,42 +838,32 @@ export default function LandingPage() {
               setShowAIModal(false);
               setAiPrompt("");
             }}
-            className="fixed inset-0 bg-black/80 backdrop-blur-xl z-[100] animate-fade-in-fast"
+            className="fixed inset-0 bg-black/80 backdrop-blur-xl z-[100] animate-lp-fade"
           />
-
-          <div className="fixed inset-0 z-[101] flex items-center justify-center p-4 animate-modal-in">
+          <div className="fixed inset-0 z-[101] flex items-center justify-center p-4 animate-lp-modal">
             <div className="relative w-full max-w-2xl">
-              {/* Soft Glow */}
               <div className="absolute inset-0 bg-white/[0.03] rounded-2xl blur-3xl" />
-
               <div className="relative bg-[#0A0A0A]/95 border border-white/[0.12] rounded-2xl shadow-2xl backdrop-blur-2xl overflow-hidden">
-                {/* Top Highlight */}
                 <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-
-                {/* Header */}
                 <div className="px-6 py-5 border-b border-white/[0.06] flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div>
-                      <h3 className="text-[15px] font-medium text-white tracking-tight">
-                        Generate API Workflow
-                      </h3>
-                      <p className="text-[13px] text-white/30 font-light">
-                        Describe your API and let AI build it
-                      </p>
-                    </div>
+                  <div>
+                    <h3 className="text-[15px] font-medium text-white tracking-tight">
+                      Generate API Workflow
+                    </h3>
+                    <p className="text-[13px] text-white/30 font-light">
+                      Describe your API and let AI build it
+                    </p>
                   </div>
                   <button
                     onClick={() => {
                       setShowAIModal(false);
                       setAiPrompt("");
                     }}
-                    className="p-2 hover:bg-white/[0.06] rounded-lg transition-all duration-300 hover:scale-105 active:scale-95"
+                    className="p-2 hover:bg-white/[0.06] rounded-lg transition-all duration-300"
                   >
                     <X size={16} className="text-white/40" strokeWidth={1.5} />
                   </button>
                 </div>
-
-                {/* Content */}
                 <div className="p-6">
                   <div className="mb-4">
                     <label className="block text-[12px] text-white/40 mb-2.5 font-medium tracking-wide uppercase">
@@ -290,29 +873,27 @@ export default function LandingPage() {
                       <textarea
                         value={aiPrompt}
                         onChange={(e) => setAiPrompt(e.target.value)}
-                        onKeyDown={handleKeyDown}
+                        onKeyDown={handleAiKeyDown}
                         placeholder="Create a login API with email validation, password hashing, and JWT token generation"
                         disabled={isGenerating}
                         autoFocus
                         className="w-full h-32 px-4 py-3 bg-white/[0.03] border border-white/[0.08] hover:border-white/[0.12] rounded-xl text-[14px] text-white placeholder-white/20 resize-none focus:outline-none focus:border-white/[0.16] focus:bg-white/[0.04] transition-all duration-300 backdrop-blur-xl"
                       />
-                      <div className="absolute bottom-3 right-3 text-[10px] text-white/20 font-mono tracking-wider">
+                      <div className="absolute bottom-3 right-3 text-[10px] text-white/20 font-mono">
                         {aiPrompt.length}/500
                       </div>
                     </div>
                   </div>
-
-                  {/* Helper Text */}
                   <div className="flex items-center justify-between text-[11px] text-white/30 mb-6 px-0.5">
                     <span className="flex items-center gap-2">
                       <kbd className="px-2 py-1 bg-white/[0.04] border border-white/[0.08] rounded text-[10px] font-mono">
                         ⏎
-                      </kbd>
+                      </kbd>{" "}
                       to generate
                       <span className="text-white/10">•</span>
                       <kbd className="px-2 py-1 bg-white/[0.04] border border-white/[0.08] rounded text-[10px] font-mono">
                         ESC
-                      </kbd>
+                      </kbd>{" "}
                       to close
                     </span>
                     <span className="flex items-center gap-1.5 font-medium tracking-wide">
@@ -320,8 +901,6 @@ export default function LandingPage() {
                       AI-POWERED
                     </span>
                   </div>
-
-                  {/* Actions */}
                   <div className="flex items-center gap-3">
                     <button
                       onClick={() => {
@@ -329,14 +908,14 @@ export default function LandingPage() {
                         setAiPrompt("");
                       }}
                       disabled={isGenerating}
-                      className="flex-1 px-4 py-2.5 text-[13px] font-medium text-white/50 hover:text-white bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.08] rounded-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-xl hover:scale-[1.01] active:scale-[0.99]"
+                      className="flex-1 px-4 py-2.5 text-[13px] font-medium text-white/50 hover:text-white bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.08] rounded-lg transition-all duration-300 disabled:opacity-50 backdrop-blur-xl"
                     >
                       Cancel
                     </button>
                     <button
                       onClick={handleGenerateClick}
                       disabled={!aiPrompt.trim() || isGenerating}
-                      className="flex-1 px-4 py-2.5 text-[13px] font-medium text-black bg-white hover:bg-white/90 rounded-lg flex items-center justify-center gap-2 transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed hover:scale-[1.01] active:scale-[0.99] shadow-[0_0_30px_rgba(255,255,255,0.15)]"
+                      className="flex-1 px-4 py-2.5 text-[13px] font-medium text-black bg-white hover:bg-white/90 rounded-lg flex items-center justify-center gap-2 transition-all duration-300 disabled:opacity-40 shadow-[0_0_30px_rgba(255,255,255,0.15)]"
                     >
                       {isGenerating ? (
                         <>
@@ -369,15 +948,14 @@ export default function LandingPage() {
               From idea to production API in minutes
             </p>
           </div>
-
           <div className="grid lg:grid-cols-2 gap-4">
             {[
               {
                 step: "01",
-                icon: Brain,
-                title: "Generate with AI or Build Manually",
+                icon: Database,
+                title: "Connect Your Database",
                 description:
-                  "Describe your API in plain English and let AI connect the nodes, or drag and drop nodes yourself.",
+                  "Start by linking your MongoDB database. Your schemas and collections are automatically discovered.",
               },
               {
                 step: "02",
@@ -445,7 +1023,6 @@ export default function LandingPage() {
               Everything you need to build production-ready APIs
             </p>
           </div>
-
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
             {[
               {
@@ -520,7 +1097,7 @@ export default function LandingPage() {
                 Join developers building APIs 10× faster with Orchestrix
               </p>
               <button
-                onClick={() => setShowAIModal(true)}
+                onClick={() => requireDb("ai")}
                 className="px-6 py-3 text-[14px] font-medium text-black bg-white hover:bg-white/90 rounded-lg inline-flex items-center gap-2 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] shadow-[0_0_40px_rgba(255,255,255,0.12)]"
               >
                 Get Started Free
@@ -542,56 +1119,32 @@ export default function LandingPage() {
               <span className="text-[15px] font-medium">Orchestrix</span>
             </div>
             <p className="text-[13px] text-white/20 font-light">
-              © 2024 Orchestrix. All rights reserved.
+              © 2025 Orchestrix. All rights reserved.
             </p>
           </div>
         </div>
       </footer>
 
       <style>{`
-        @keyframes fade-in {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes fade-in-up {
-          from { opacity: 0; transform: translateY(24px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes fade-in-fast {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes slide-down {
-          from { transform: translateY(-100%); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
-        }
-        @keyframes modal-in {
-          from { 
-            opacity: 0;
-            transform: scale(0.96) translateY(16px);
-          }
-          to { 
-            opacity: 1;
-            transform: scale(1) translateY(0);
-          }
-        }
-        @keyframes pulse-subtle {
-          0%, 100% { opacity: 0.6; }
-          50% { opacity: 1; }
-        }
-        @keyframes scroll {
-          0% { transform: translateY(0); opacity: 0; }
-          50% { opacity: 1; }
-          100% { transform: translateY(10px); opacity: 0; }
-        }
+        @keyframes fade-in         { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes fade-in-up      { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slide-down      { from { transform: translateY(-100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes modal-in        { from { opacity: 0; transform: scale(0.96) translateY(16px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+        @keyframes pulse-subtle    { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
+        @keyframes scroll          { 0% { transform: translateY(0); opacity: 0; } 50% { opacity: 1; } 100% { transform: translateY(10px); opacity: 0; } }
+        @keyframes lp-fade         { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes lp-modal        { from { opacity: 0; transform: scale(0.97) translateY(12px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+        @keyframes lp-ping         { 75%, 100% { transform: scale(2); opacity: 0; } }
 
-        .animate-fade-in { animation: fade-in 0.8s cubic-bezier(0.16, 1, 0.3, 1); }
-        .animate-fade-in-up { animation: fade-in-up 1s cubic-bezier(0.16, 1, 0.3, 1); }
-        .animate-fade-in-fast { animation: fade-in-fast 0.2s ease-out; }
-        .animate-slide-down { animation: slide-down 0.8s cubic-bezier(0.16, 1, 0.3, 1); }
-        .animate-modal-in { animation: modal-in 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
-        .animate-pulse-subtle { animation: pulse-subtle 3s ease-in-out infinite; }
-        .animate-scroll { animation: scroll 2.5s ease-in-out infinite; }
+        .animate-fade-in        { animation: fade-in   0.8s cubic-bezier(0.16, 1, 0.3, 1); }
+        .animate-fade-in-up     { animation: fade-in-up 1s cubic-bezier(0.16, 1, 0.3, 1); }
+        .animate-slide-down     { animation: slide-down 0.8s cubic-bezier(0.16, 1, 0.3, 1); }
+        .animate-modal-in       { animation: modal-in  0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+        .animate-pulse-subtle   { animation: pulse-subtle 3s ease-in-out infinite; }
+        .animate-scroll         { animation: scroll 2.5s ease-in-out infinite; }
+        .animate-lp-fade        { animation: lp-fade  0.2s ease-out both; }
+        .animate-lp-modal       { animation: lp-modal 0.35s cubic-bezier(0.16, 1, 0.3, 1) both; }
+        .animate-lp-ping        { animation: lp-ping  1.4s cubic-bezier(0, 0, 0.2, 1) infinite; }
 
         .animation-delay-100 { animation-delay: 100ms; }
         .animation-delay-200 { animation-delay: 200ms; }
@@ -601,11 +1154,7 @@ export default function LandingPage() {
         .bg-noise {
           background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='3.5' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
         }
-
-        * {
-          -webkit-font-smoothing: antialiased;
-          -moz-osx-font-smoothing: grayscale;
-        }
+        * { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
       `}</style>
     </div>
   );

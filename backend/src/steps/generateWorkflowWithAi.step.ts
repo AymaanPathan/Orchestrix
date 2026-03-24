@@ -16,8 +16,6 @@ export const config: ApiRouteConfig = {
   flows: ["WorkflowBuilder"],
 };
 
-/* ---------------- LABEL DEFAULTS (SAFETY NET) ---------------- */
-
 function capitalize(str: string) {
   return str.charAt(0).toUpperCase() + str.slice(1);
 }

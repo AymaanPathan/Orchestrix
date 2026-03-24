@@ -1,3 +1,4 @@
+/* eslint-disable react/no-unescaped-entities */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
@@ -20,6 +21,7 @@ import NodeEditorSidebar from "@/components/Ui/NodesSidebar";
 import { Sidebar } from "@/components/Ui/Sidebar";
 import ExecutionLogsSidebar from "@/components/Ui/ExecutionLogsSidebar";
 import SaveWorkflowModal from "@/components/workflow/SaveWorkflowModal";
+import { DatabaseConnect } from "@/components/connection/DatabaseConnect";
 
 import { createNode } from "@/components/workflow/nodes/addNode";
 import { saveNodeChanges } from "@/components/workflow/nodes/saveNode";
@@ -35,26 +37,26 @@ import { validateGraph } from "@/components/workflow/validation/validateGraph";
 import { RootDispatch, RootState } from "@/store";
 import { useDispatch, useSelector } from "react-redux";
 import AnimatedDashedEdge from "@/components/Ui/AnimatedDashedEdge";
-import { fetchDbSchemas } from "@/store/dbSchemasSlice";
-import { useExecutionStream } from "@/hooks/useExecutionStream";
+import {
+  fetchDbSchemas,
+  setUserDbConnected,
+  clearDbSchemas,
+} from "@/store/dbSchemasSlice";
 import { ExecutionStreamProvider } from "@/components/ExecutionStreamProvider";
-type ExecutionLog = {
-  executionId: string;
-  stepIndex: number;
-  stepType: string;
-  phase: "start" | "data" | "end" | "error";
-  title: string;
-  data?: any;
-  durationMs?: number;
-  timestamp: number;
-};
+import type { ExecutionLog } from "@/components/ExecutionStreamProvider";
 
 export default function WorkflowPage() {
   const [graphMeta, setGraphMeta] = useState<any>(null);
   const dbSchemas = useSelector((state: RootState) => state.dbSchemas.schemas);
+  const isUserDbConnected = useSelector(
+    (state: RootState) => state.dbSchemas.isUserDbConnected,
+  );
+  const ownerId = useSelector((state: RootState) => state.dbSchemas.ownerId);
+  const userDbLabel = useSelector(
+    (state: RootState) => state.dbSchemas.userDbLabel,
+  );
   const dispatch = useDispatch<RootDispatch>();
-  const schemas = useSelector((state: RootState) => state.dbSchemas.schemas);
-  console.log("DB Schemas in WorkflowPage:", schemas);
+
   const [nodes, setNodes, onNodesChange] = useNodesState<any>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<any>([]);
   const [selectedNode, setSelectedNode] = useState<any>(null);
@@ -68,7 +70,6 @@ export default function WorkflowPage() {
     logs: ExecutionLog[];
     finished: boolean;
   } | null>(null);
-  // Modal state
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [savedWorkflowData, setSavedWorkflowData] = useState<{
@@ -77,32 +78,35 @@ export default function WorkflowPage() {
     apiName: string;
   } | null>(null);
 
-  console.log("Rerendering WorkflowPage", savedWorkflowData);
-  // STEP NUMBERS
-  const stepNumbers = calcStepNumbers(nodes, edges);
-
+  const stepNumbers = calcStepNumbers(nodes, edges) as Record<string, number>;
   const nodesWithSteps = nodes.map((n) => ({
     ...n,
-    data: {
-      ...n.data,
-      _stepNumber: stepNumbers[n.id] ?? null,
-    },
+    data: { ...n.data, _stepNumber: stepNumbers[n.id] ?? null },
   }));
 
+  // ── On mount: check if user already has a DB connected ──────────────────
   useEffect(() => {
     dispatch(fetchDbSchemas());
   }, [dispatch]);
 
-  // ORDER MAPPING
-  function computeStepMapping(nodes: any[], edges: any[]) {
-    const ordered = getExecutionOrder(nodes, edges);
-    const map: Record<string, number> = {};
-    let step = 1;
-    ordered.forEach((n) => (map[n.id] = step++));
-    return map;
-  }
+  // ── DB connection handlers ───────────────────────────────────────────────
+  const handleDbConnected = useCallback(
+    (schemas: Record<string, string[]>) => {
+      dispatch(
+        setUserDbConnected({
+          schemas,
+          label: userDbLabel ?? "My Database",
+        }),
+      );
+    },
+    [dispatch, userDbLabel],
+  );
 
-  // Add this after your other state declarations (around line 75)
+  const handleDbDisconnected = useCallback(() => {
+    dispatch(clearDbSchemas());
+  }, [dispatch]);
+
+  // ── Logs update ──────────────────────────────────────────────────────────
   const handleLogsUpdate = useCallback((logs: ExecutionLog[]) => {
     setExecution((prev) => {
       if (!prev) return prev;
@@ -111,13 +115,14 @@ export default function WorkflowPage() {
         logs,
         finished: logs.some(
           (l) =>
-            l.phase === "execution_finished" || l.phase === "execution_failed"
+            (l as any).phase === "execution_finished" ||
+            (l as any).phase === "execution_failed",
         ),
       };
     });
-  }, []); // Empty deps since we use the functional form of setExecution
+  }, []);
 
-  // GRAPH META
+  // ── Graph meta ───────────────────────────────────────────────────────────
   useEffect(() => {
     try {
       const meta = buildGraphMeta(nodes, edges, dbSchemas);
@@ -125,8 +130,9 @@ export default function WorkflowPage() {
     } catch {
       setGraphMeta(null);
     }
-  }, [nodes, edges]);
+  }, [nodes, edges, dbSchemas]);
 
+  // ── Load AI workflow from sessionStorage ─────────────────────────────────
   useEffect(() => {
     const aiWorkflow = sessionStorage.getItem("aiWorkflow");
     if (aiWorkflow) {
@@ -134,107 +140,82 @@ export default function WorkflowPage() {
       setNodes(nodes);
       setEdges(edges);
       sessionStorage.removeItem("aiWorkflow");
-
       const meta = buildGraphMeta(nodes, edges, dbSchemas);
       setGraphMeta(meta);
     }
   }, []);
 
   useEffect(() => {
-    setEdges((eds) =>
-      eds.map((e) => ({
-        ...e,
-        type: e.type ?? "animated",
-      }))
-    );
+    setEdges((eds) => eds.map((e) => ({ ...e, type: e.type ?? "animated" })));
   }, []);
 
   useEffect(() => {
-    const stepMap = computeStepMapping(nodes, edges);
-
+    const ordered = getExecutionOrder(nodes, edges);
+    const map: Record<string, number> = {};
+    let step = 1;
+    ordered.forEach((n) => (map[n.id] = step++));
     setNodes((prev) =>
       prev.map((n) => ({
         ...n,
-        data: {
-          ...n.data,
-          _stepNumber: stepMap[n.id] || 0,
-        },
-      }))
+        data: { ...n.data, _stepNumber: map[n.id] || 0 },
+      })),
     );
   }, [nodes.length, edges.length]);
 
-  // CONNECTIONS
+  // ── Connections ──────────────────────────────────────────────────────────
   const onConnect = (params: Connection) => {
-    const edgeWithId = {
-      ...params,
-      id: uuid(),
-      type: "animated", // ✅ IMPORTANT
-    };
-
+    const edgeWithId = { ...params, id: uuid(), type: "animated" };
     const result = handleOnConnect(
       edgeWithId,
       rfInstance,
       nodes,
       edges,
-      dbSchemas
+      dbSchemas,
     );
-
     try {
       validateGraph(result.nodes, result.edges, dbSchemas);
     } catch (err: any) {
       console.warn("Invalid connection:", err?.message);
       return;
     }
-
     setNodes(result.nodes);
     setEdges(result.edges);
     setGraphMeta(buildGraphMeta(result.nodes, result.edges, dbSchemas));
   };
 
-  // AI WORKFLOW GENERATION
+  // ── AI generation ────────────────────────────────────────────────────────
   const generateAIWorkflow = async () => {
     const prompt = aiPrompt.trim();
     if (!prompt) return;
-
     setIsGenerating(true);
-
     try {
       const res = await fetch("http://localhost:3000/workflow/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt }),
       });
-
       const ai = await res.json();
-
       if (!ai.nodes || !ai.edges) {
         alert("Invalid AI workflow returned");
         return;
       }
-
-      const reactNodes = ai.nodes.map((n, index) => ({
+      const reactNodes = ai.nodes.map((n: any, index: number) => ({
         id: n.id,
         type: n.type,
         position: { x: (index % 3) * 280, y: Math.floor(index / 3) * 180 },
         data: n.data,
       }));
-
-      const reactEdges = ai.edges.map((e) => ({
+      const reactEdges = ai.edges.map((e: any) => ({
         id: e.id,
         source: e.source,
         target: e.target,
         type: "animated",
       }));
-
       setNodes(reactNodes);
       setEdges(reactEdges);
-
-      const meta = buildGraphMeta(reactNodes, reactEdges, dbSchemas);
-      setGraphMeta(meta);
-
+      setGraphMeta(buildGraphMeta(reactNodes, reactEdges, dbSchemas));
       setAiPrompt("");
     } catch (error) {
-      console.error("AI generation error:", error);
       alert("Failed to generate workflow");
     } finally {
       setIsGenerating(false);
@@ -248,30 +229,20 @@ export default function WorkflowPage() {
     }
   };
 
-  // SAVE WORKFLOW - Opens modal
+  // ── Save ─────────────────────────────────────────────────────────────────
   const saveWorkflow = async () => {
     try {
       validateGraph(nodes, edges, dbSchemas);
-      console.log("✅ Workflow valid, opening save modal");
-      console.log("🧾 Nodes:", nodes);
-      console.log("🧾 Edges:", edges);
     } catch (err: any) {
       return alert("Cannot save workflow: " + err.message);
     }
-
-    // Reset saved data and open the modal
     setSavedWorkflowData(null);
     setSaveModalOpen(true);
   };
-  function extractInputVariables(
-    nodes: any[]
-  ): Array<{ name: string; type?: string; default?: any }> {
+
+  function extractInputVariables(nodes: any[]) {
     const inputNode = nodes.find((n) => n.type === "input");
-
-    if (!inputNode?.data?.fields?.variables) {
-      return [];
-    }
-
+    if (!inputNode?.data?.fields?.variables) return [];
     return inputNode.data.fields.variables.map((v: any) => ({
       name: v.name,
       type: v.type || "string",
@@ -279,44 +250,32 @@ export default function WorkflowPage() {
     }));
   }
 
-  // ACTUAL SAVE - Called from modal with apiName
   const handleSaveWithApiName = async (apiName: string) => {
     setIsSaving(true);
-
     try {
       const payload = buildForSave(nodes, edges);
       const inputVariables = extractInputVariables(nodes);
-
       const res = await fetch("http://localhost:3000/workflows/save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...payload,
-          apiName,
-          inputVariables, // Include input variables
-        }),
+        body: JSON.stringify({ ...payload, apiName, inputVariables }),
       });
-
       const result = await res.json();
-      console.log("💾 Workflow saved:", result);
-
       if (!result.ok) throw new Error("Save failed");
-
-      // Set saved data to show success screen
       setSavedWorkflowData({
         workflowId: result.workflowId,
         apiPath: result.apiPath,
         apiName: result.apiName,
         inputVariables: result.inputVariables,
-      });
+      } as any);
     } catch (error) {
-      console.error("Save error:", error);
       alert("Failed to save workflow");
     } finally {
       setIsSaving(false);
     }
   };
 
+  // ── Run ──────────────────────────────────────────────────────────────────
   const runWorkflow = async () => {
     try {
       validateGraph(nodes, edges, dbSchemas);
@@ -324,37 +283,28 @@ export default function WorkflowPage() {
       alert("Cannot run workflow: " + err.message);
       return;
     }
-
     const payload = buildForExecute(nodes, edges);
-
     const res = await fetch("http://localhost:3000/workflow/execute", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-
     const output = await res.json();
-    console.log("🚀 Execution started:", output);
-
     if (!output.executionId) return;
-
     setExecution({
       executionId: output.executionId,
       logs: [],
       finished: false,
     });
-
     setLogsOpen(true);
   };
 
-  // NODE SAVE HANDLER
   const handleSaveNode = (id: string, newData: any) => {
     setNodes((curr) => saveNodeChanges(id, newData, curr));
   };
 
-  const edgeTypes = {
-    animated: AnimatedDashedEdge,
-  };
+  const edgeTypes = { animated: AnimatedDashedEdge };
+
   return (
     <div className="w-full h-screen bg-gradient-to-br from-[#0a0a0a] via-[#111] to-[#0a0a0a] flex overflow-hidden">
       <Sidebar
@@ -370,7 +320,7 @@ export default function WorkflowPage() {
       />
 
       <div className="flex-1 flex flex-col relative">
-        {/* Top Nav Bar */}
+        {/* ── Top Nav Bar ─────────────────────────────────────────────── */}
         <div className="h-[60px] bg-[#191919]/60 backdrop-blur-xl border-b border-white/[0.06] flex items-center px-5 gap-3">
           {!sidebarOpen && (
             <button
@@ -381,9 +331,26 @@ export default function WorkflowPage() {
             </button>
           )}
 
+          {/* ── DB Connect button — left of save/run ─────────────── */}
+          <DatabaseConnect
+            ownerId={ownerId}
+            onConnected={handleDbConnected}
+            onDisconnected={handleDbDisconnected}
+          />
+
+          {/* Spacer pushes save/run to the right */}
+          <div className="flex-1" />
+
+          {/* DB not connected warning */}
+          {!isUserDbConnected && (
+            <span className="text-[11px] text-white/25 hidden sm:block">
+              Connect a database to use DB nodes
+            </span>
+          )}
+
           <button
             onClick={saveWorkflow}
-            className="px-4 py-2 text-[13px] font-medium text-white/70 hover:text-white bg-white/[0.03] 
+            className="px-4 py-2 text-[13px] font-medium text-white/70 hover:text-white bg-white/[0.03]
                 border border-white/[0.08] rounded-lg flex items-center gap-2 transition-all active:scale-95"
           >
             <Save size={14} />
@@ -392,7 +359,7 @@ export default function WorkflowPage() {
 
           <button
             onClick={runWorkflow}
-            className="px-4 py-2 text-[13px] font-medium text-black bg-white hover:bg-white/90 rounded-lg 
+            className="px-4 py-2 text-[13px] font-medium text-black bg-white hover:bg-white/90 rounded-lg
                 flex items-center gap-2 transition-all active:scale-95"
           >
             <Play size={14} fill="black" />
@@ -400,7 +367,7 @@ export default function WorkflowPage() {
           </button>
         </div>
 
-        {/* ReactFlow Canvas */}
+        {/* ── Canvas ──────────────────────────────────────────────────── */}
         <div className="flex-1 relative">
           <div className="absolute inset-0">
             <ReactFlow
@@ -438,9 +405,9 @@ export default function WorkflowPage() {
             )}
           </div>
 
-          {/* Empty State */}
+          {/* ── Empty state ──────────────────────────────────────────── */}
           {nodes.length === 0 && (
-            <div className="w-full h-full flex items-center justify-center bg-white/[0.02]">
+            <div className="w-full h-full flex items-center justify-center bg-white/[0.02] pointer-events-none">
               <div className="text-center space-y-3">
                 <div className="w-16 h-16 rounded-2xl bg-white/[0.05] flex items-center justify-center mx-auto">
                   <Workflow size={28} className="text-white/40" />
@@ -449,13 +416,20 @@ export default function WorkflowPage() {
                   Start building your workflow
                 </p>
                 <p className="text-[13px] text-white/50">
-                  Use the sidebar or describe what you need below
+                  {isUserDbConnected
+                    ? "Use the sidebar or describe what you need below"
+                    : "Connect your database first, then start building"}
                 </p>
+                {!isUserDbConnected && (
+                  <p className="text-[12px] text-white/30">
+                    ↑ Click "Connect Database" in the toolbar above
+                  </p>
+                )}
               </div>
             </div>
           )}
 
-          {/* AI Prompt Input */}
+          {/* ── AI Prompt ────────────────────────────────────────────── */}
           <div className="absolute bottom-0 left-0 right-0 p-6 pointer-events-none">
             <div className="max-w-3xl mx-auto pointer-events-auto">
               <div className="bg-[#191919]/95 backdrop-blur-xl border border-white/[0.1] rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
@@ -465,29 +439,23 @@ export default function WorkflowPage() {
                       <Sparkles size={16} className="text-white/70" />
                     </div>
                   </div>
-
                   <div className="flex-1 min-w-0">
                     <textarea
                       value={aiPrompt}
                       onChange={(e) => setAiPrompt(e.target.value)}
                       onKeyDown={handleKeyDown}
-                      placeholder="Describe your API workflow... (e.g., Create a login API with email validation)"
+                      placeholder="Describe your API workflow..."
                       disabled={isGenerating}
-                      className="w-full bg-transparent text-[14px] text-white placeholder-white/40 
+                      className="w-full bg-transparent text-[14px] text-white placeholder-white/40
                           resize-none focus:outline-none leading-relaxed max-h-32 min-h-[24px]"
                       rows={1}
-                      style={{
-                        height: "auto",
-                        minHeight: "24px",
-                      }}
                       onInput={(e) => {
-                        const target = e.target as HTMLTextAreaElement;
-                        target.style.height = "auto";
-                        target.style.height = target.scrollHeight + "px";
+                        const t = e.target as HTMLTextAreaElement;
+                        t.style.height = "auto";
+                        t.style.height = t.scrollHeight + "px";
                       }}
                     />
                   </div>
-
                   <div className="flex-shrink-0 mb-1">
                     <button
                       onClick={generateAIWorkflow}
@@ -507,7 +475,6 @@ export default function WorkflowPage() {
                     </button>
                   </div>
                 </div>
-
                 <div className="px-4 pb-3 flex items-center justify-between text-[11px] text-white/40">
                   <span>
                     Press Enter to generate • Shift+Enter for new line
@@ -523,7 +490,7 @@ export default function WorkflowPage() {
         </div>
       </div>
 
-      {/* Execution Logs Sidebar */}
+      {/* ── Execution Logs ────────────────────────────────────────────────── */}
       <ExecutionLogsSidebar
         isOpen={logsOpen}
         onClose={() => setLogsOpen(false)}
@@ -532,7 +499,7 @@ export default function WorkflowPage() {
         executionId={execution?.executionId || null}
       />
 
-      {/* Save Workflow Modal */}
+      {/* ── Save Modal ────────────────────────────────────────────────────── */}
       <SaveWorkflowModal
         isOpen={saveModalOpen}
         onClose={() => {
@@ -544,8 +511,6 @@ export default function WorkflowPage() {
         savedData={savedWorkflowData}
       />
 
-      {/* Execution Stream Provider - conditionally rendered */}
-      {/* Execution Stream Provider - conditionally rendered */}
       {execution?.executionId && (
         <ExecutionStreamProvider
           executionId={execution.executionId}

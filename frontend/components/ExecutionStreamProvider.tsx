@@ -2,7 +2,7 @@
 import { useExecutionStream } from "@/hooks/useExecutionStream";
 import { useEffect } from "react";
 
-type ExecutionLog = {
+export type ExecutionLog = {
   executionId: string;
   stepIndex?: number;
   stepType?: string;
@@ -18,15 +18,13 @@ export function ExecutionStreamProvider({
   onUpdate,
 }: {
   executionId: string | null;
-  onUpdate: (logs: ExecutionLog[]) => void;
+  onUpdate?: (logs: ExecutionLog[]) => void;
 }) {
-  // Get logs using the safe hook
   const logs = useExecutionStream(executionId);
 
-  // Update parent whenever logs change
   useEffect(() => {
     if (executionId) {
-      onUpdate(logs);
+      onUpdate?.(logs);
     }
   }, [logs, executionId, onUpdate]);
 
