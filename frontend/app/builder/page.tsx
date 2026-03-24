@@ -287,7 +287,7 @@ export default function WorkflowPage() {
     const res = await fetch("http://localhost:3000/workflow/execute", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ ...payload, ownerId }),
     });
     const output = await res.json();
     if (!output.executionId) return;

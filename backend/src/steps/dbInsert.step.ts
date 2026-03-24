@@ -1,5 +1,4 @@
 import { EventConfig, StepHandler } from "motia";
-import { connectMongo } from "../lib/mongo";
 import { resolveObject } from "../lib/resolveValue";
 import {
   logStepStart,
@@ -16,7 +15,7 @@ import {
   logExecutionFinished,
   logExecutionFailed,
 } from "../lib/logStep";
-import { getModel } from "../lib/getModel";
+import { getUserModel } from "../lib/getUserModel";
 
 export const config: EventConfig = {
   name: "dbInsert",
@@ -34,27 +33,26 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
       collection: string;
       data: Record<string, any>;
       output?: string;
-
       steps: any[];
       index: number;
       vars: Record<string, any>;
       executionId: string;
     };
 
+  const ownerId = (payload as any).ownerId || "default-owner";
   const totalSteps = steps?.length || 0;
   const isLastStep = index >= totalSteps - 1;
   const stepId = `dbinsert-${index}`;
 
   try {
-    await connectMongo();
+    // ── Get model on USER's database ──────────────────────────────────────
+    const Model = await getUserModel(ownerId, collection);
 
-    // Console logs
     logStepStart(index, "dbInsert");
     logKV("Collection", collection);
     logKV("Raw insert payload", data);
     logKV("Vars", vars);
 
-    // ───────────────── STREAM: STEP STARTED ─────────────────
     await logStepStartStream(streams, {
       executionId,
       stepId,
@@ -65,7 +63,6 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
       input: { collection, data },
     });
 
-    // ───────────────── STREAM: CONNECTING ─────────────────
     await logStepInfo(streams, {
       executionId,
       stepId,
@@ -75,19 +72,6 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
       message: "Establishing MongoDB connection...",
     });
 
-    // ───────────────── STREAM: LOCATING MODEL ─────────────────
-    await logStepInfo(streams, {
-      executionId,
-      stepId,
-      stepIndex: index,
-      stepType: "dbInsert",
-      title: "Locating collection model",
-      message: `Looking for model: ${collection}`,
-    });
-
-    const Model = getModel(collection);
-
-    // ───────────────── STREAM: MODEL FOUND ─────────────────
     await logStepInfo(streams, {
       executionId,
       stepId,
@@ -97,7 +81,6 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
       message: `Successfully located "${collection}" model`,
     });
 
-    // ───────────────── STREAM: RESOLVING PAYLOAD ─────────────────
     await logStepInfo(streams, {
       executionId,
       stepId,
@@ -111,7 +94,7 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
     const resolved = resolveObject(vars, data || {});
     logKV("Resolved payload", resolved);
 
-    // 🔥 CRITICAL FIX — UNWRAP `data`
+    // Unwrap nested `data` key if AI generated it that way
     const insertDoc =
       resolved &&
       typeof resolved === "object" &&
@@ -122,7 +105,6 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
 
     logKV("Final insert document", insertDoc);
 
-    // ───────────────── SAFETY GUARDS ─────────────────
     if (
       !insertDoc ||
       typeof insertDoc !== "object" ||
@@ -131,25 +113,19 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
       throw new Error("dbInsert: insert document is empty after resolution");
     }
 
-    // ───────────────── STREAM: DOCUMENT RESOLVED ─────────────────
     const fieldCount = Object.keys(insertDoc).length;
+
     await logStepData(streams, {
       executionId,
       stepId,
       stepIndex: index,
       stepType: "dbInsert",
       title: "Insert document resolved successfully",
-      message: `Document ready with ${fieldCount} field${
-        fieldCount !== 1 ? "s" : ""
-      }`,
+      message: `Document ready with ${fieldCount} field${fieldCount !== 1 ? "s" : ""}`,
       data: insertDoc,
-      metadata: {
-        fieldCount,
-        fields: Object.keys(insertDoc),
-      },
+      metadata: { fieldCount, fields: Object.keys(insertDoc) },
     });
 
-    // ───────────────── STREAM: INSERTING ─────────────────
     await logStepInfo(streams, {
       executionId,
       stepId,
@@ -159,11 +135,9 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
       message: "Creating new record in database...",
     });
 
-    const created = await Model.create(insertDoc);
-
+    const created = (await Model.create(insertDoc)) as any;
     logKV("Insert result", created);
 
-    // ───────────────── STREAM: INSERT RESULT ─────────────────
     await logStepData(streams, {
       executionId,
       stepId,
@@ -179,7 +153,6 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
       },
     });
 
-    // ───────────────── STREAM: STEP FINISHED ─────────────────
     await logStepSuccess(streams, {
       executionId,
       stepId,
@@ -189,17 +162,12 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
       message: `Document inserted into "${collection}" successfully`,
       output: created,
       data: created,
-      metadata: {
-        insertedId: created._id,
-        collection,
-        fieldCount,
-      },
+      metadata: { insertedId: created._id, collection, fieldCount },
       startedAt,
     });
 
     logSuccess("dbInsert", Date.now() - startedAt);
 
-    // ───────────────── STREAM: EXECUTION FINISHED (if last step) ─────────────────
     if (isLastStep) {
       await logExecutionFinished(streams, {
         executionId,
@@ -208,23 +176,19 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
       });
     }
 
-    // ───────────────── CONTINUE WORKFLOW ─────────────────
     await ctx.emit({
       topic: "workflow.run",
       data: {
         steps,
         index: index + 1,
-        vars: {
-          ...vars,
-          [output || "created"]: created,
-        },
+        vars: { ...vars, [output || "created"]: created },
         executionId,
+        ownerId,
       },
     });
   } catch (err) {
     logError("dbInsert", err);
 
-    // ───────────────── STREAM: STEP ERROR ─────────────────
     await logStepError(streams, {
       executionId,
       stepId,
@@ -232,14 +196,10 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
       stepType: "dbInsert",
       totalSteps,
       error: String(err),
-      data: {
-        collection,
-        attemptedData: data,
-      },
+      data: { collection, attemptedData: data },
       startedAt,
     });
 
-    // ───────────────── STREAM: EXECUTION FAILED ─────────────────
     await logExecutionFailed(streams, {
       executionId,
       failedStepIndex: index,

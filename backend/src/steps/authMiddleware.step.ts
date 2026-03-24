@@ -1,9 +1,5 @@
 import { EventConfig, StepHandler } from "motia";
 import jwt from "jsonwebtoken";
-import { connectMongo } from "../lib/mongo";
-import mongoose from "mongoose";
-
-const users = mongoose.connection.models["users"];
 
 export const config: EventConfig = {
   name: "authMiddleware",
@@ -13,20 +9,25 @@ export const config: EventConfig = {
 };
 
 export const handler: StepHandler<typeof config> = async (payload, ctx) => {
-  const { step, steps, index, vars, executionId } = payload as any;
-  const authHeader = vars?.authorization;
+  const { steps, index, vars, executionId } = payload as any;
+  const ownerId = (payload as any).ownerId || "default-owner";
+
+  // Auth header can come from vars.authorization or vars.input.authorization
+  const authHeader =
+    vars?.authorization ||
+    vars?.input?.authorization ||
+    vars?.headers?.authorization;
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    throw new Error("Unauthorized");
+    throw new Error("Unauthorized: missing or invalid Authorization header");
   }
 
-  await connectMongo();
+  if (!process.env.JWT_SECRET) {
+    throw new Error("JWT_SECRET is not configured");
+  }
 
   const token = authHeader.split(" ")[1];
-  const decoded: any = jwt.verify(token, process.env.JWT_SECRET!);
-  const user = await users.findById(decoded.userId);
-
-  if (!user) throw new Error("User not found");
+  const decoded: any = jwt.verify(token, process.env.JWT_SECRET);
 
   await ctx.emit({
     topic: "workflow.run",
@@ -35,13 +36,10 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
       index: index + 1,
       vars: {
         ...vars,
-        authUser: {
-          id: user._id,
-          email: user.email,
-          role: user.role,
-        },
+        currentUser: decoded,
       },
       executionId,
+      ownerId, // ← always forward
     },
   });
 };

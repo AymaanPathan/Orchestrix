@@ -15,53 +15,40 @@ export const config: ApiRouteConfig = {
 export const handler: StepHandler<typeof config> = async (req, ctx) => {
   await connectMongo();
   const { logger } = ctx;
-  await ctx.emit({
-    topic: "models.register",
-    data: {},
-  });
+
   const { workflowId, apiName } = req.pathParams || {};
 
   if (!workflowId || !apiName) {
-    return {
-      status: 400,
-      body: { error: "Invalid workflow path" },
-    };
+    return { status: 400, body: { error: "Invalid workflow path" } };
   }
 
-  // ✅ Ensure API is published
-  const api = await PublishedApi.findOne({
-    workflowId,
-    slug: apiName,
-  });
-
+  // Verify API is published
+  const api = await PublishedApi.findOne({ workflowId, slug: apiName });
   if (!api) {
-    return {
-      status: 404,
-      body: { error: "API not published" },
-    };
+    return { status: 404, body: { error: "API not published" } };
   }
 
-  // ✅ Load workflow
+  // Load workflow
   const workflow = await Workflow.findOne({ workflowId });
   if (!workflow) {
-    return {
-      status: 404,
-      body: { error: "Workflow not found" },
-    };
+    return { status: 404, body: { error: "Workflow not found" } };
   }
 
   const input = req.body || {};
+  const ownerId = workflow.ownerId || "default-owner";
 
   logger.info("Running published workflow", {
     workflowId,
     api: api.name,
+    ownerId,
     input,
   });
 
-  const result = await runEngine(workflow.steps, input, req.headers);
+  // Pass ownerId so engine connects to the RIGHT user database
+  const result = await runEngine(workflow.steps, input, req.headers, ownerId);
 
   return {
-    status: 200,
+    status: result.ok ? 200 : 422,
     body: result,
   };
 };

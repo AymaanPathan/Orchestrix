@@ -1,6 +1,7 @@
 import { ApiRouteConfig, StepHandler } from "motia";
 import mongoose from "mongoose";
 import { connectMongo } from "../lib/mongo.js";
+import { evictUserConnection } from "../lib/userDbPool.js";
 
 export const config: ApiRouteConfig = {
   name: "disconnectUserDb",
@@ -19,8 +20,12 @@ export const handler: StepHandler<typeof config> = async (req, ctx) => {
     return { status: 400, body: { error: "ownerId required" } };
   }
 
+  // Remove the DB record
   const UserDbConnection = getUserDbModel();
   await UserDbConnection.deleteOne({ ownerId });
+
+  // Close and evict the pooled connection so the next connect is fresh
+  await evictUserConnection(ownerId);
 
   return { status: 200, body: { ok: true } };
 };

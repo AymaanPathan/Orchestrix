@@ -26,9 +26,10 @@ export const config: EventConfig = {
 
 export const handler: StepHandler<typeof config> = async (
   payload: any,
-  ctx
+  ctx,
 ) => {
-  const { steps, index, vars, executionId } = payload;
+  const { steps, index, vars, executionId, ownerId } = payload;
+
   const { streams } = ctx;
 
   // ✅ Workflow finished
@@ -50,7 +51,7 @@ export const handler: StepHandler<typeof config> = async (
     `▶️ Executing step ${index}:`,
     step.type,
     "execution:",
-    executionId
+    executionId,
   );
 
   // ✅ STREAM LOG TO FRONTEND
@@ -76,7 +77,7 @@ export const handler: StepHandler<typeof config> = async (
   if (step.type === "emailSend") {
     if (!step.to || !step.subject || !step.body) {
       throw new Error(
-        `emailSend step misconfigured at index ${index} (to=${!!step.to}, subject=${!!step.subject}, body=${!!step.body})`
+        `emailSend step misconfigured at index ${index} (to=${!!step.to}, subject=${!!step.subject}, body=${!!step.body})`,
       );
     }
   }
@@ -88,6 +89,7 @@ export const handler: StepHandler<typeof config> = async (
       index,
       vars,
       executionId,
+      ownerId,
     },
   });
 };

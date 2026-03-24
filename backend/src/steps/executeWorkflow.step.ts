@@ -32,6 +32,7 @@ export const handler: StepHandler<typeof config> = async (req, ctx) => {
         executionId,
       },
       executionId,
+      ownerId: req.body.ownerId || "default-owner",
     },
   });
 
