@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { getUserConnection } from "./userDbPool.js";
+import { getUserConnection } from "./userDbPool";
 
 export async function getUserModel(
   ownerId: string,

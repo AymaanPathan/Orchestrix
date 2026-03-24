@@ -1,6 +1,6 @@
 import { ApiRouteConfig, StepHandler } from "motia";
-import Workflow from "../models/workflow.model.js";
-import PublishedApi from "../models/publishedApi.model.js";
+import Workflow from "../models/workflow.model";
+import PublishedApi from "../models/publishedApi.model";
 import { connectMongo } from "../lib/mongo";
 
 export const config: ApiRouteConfig = {

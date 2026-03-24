@@ -15,7 +15,7 @@ import {
   logExecutionFinished,
   logExecutionFailed,
 } from "../lib/logStep";
-import { getUserModel } from "../lib/getUserModel.js";
+import { getUserModel } from "../lib/getUserModel";
 
 export const config: EventConfig = {
   name: "dbFind",

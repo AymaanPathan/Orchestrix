@@ -1,7 +1,7 @@
 import { ApiRouteConfig, StepHandler } from "motia";
 import mongoose from "mongoose";
-import { connectMongo } from "../lib/mongo.js";
-import { getUserConnection } from "../lib/userDbPool.js";
+import { connectMongo } from "../lib/mongo";
+import { getUserConnection } from "../lib/userDbPool";
 
 export const config: ApiRouteConfig = {
   name: "getUserDbSchemas",

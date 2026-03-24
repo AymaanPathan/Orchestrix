@@ -1,7 +1,7 @@
 import { ApiRouteConfig, StepHandler } from "motia";
 import mongoose from "mongoose";
-import { connectMongo } from "../lib/mongo.js";
-import { maskUri } from "../lib/maskUri.js";
+import { connectMongo } from "../lib/mongo";
+import { maskUri } from "../lib/maskUri";
 import { decrypt } from "../lib/crypto";
 
 interface IUserDbConnection {

@@ -1,8 +1,8 @@
 import { ApiRouteConfig, StepHandler } from "motia";
-import mongoose from "mongoose";
 import dns from "dns";
-import { connectMongo } from "../lib/mongo.js";
+import { connectMongo } from "../lib/mongo";
 import { encrypt } from "../lib/crypto";
+import mongoose, { Model, Schema } from "mongoose";
 
 // ── Force Google DNS — fixes Windows ENOTFOUND on mongodb+srv:// URIs ────────
 dns.setDefaultResultOrder("ipv4first");
@@ -101,6 +101,14 @@ export const handler: StepHandler<typeof config> = async (req, ctx) => {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+interface IUserDbConnection {
+  ownerId: string;
+  encryptedUri: string;
+  label: string;
+  status: string;
+  connectedAt?: Date;
+}
+
 function maskUri(uri: string): string {
   try {
     const url = new URL(uri);
@@ -112,11 +120,14 @@ function maskUri(uri: string): string {
   }
 }
 
-function getUserDbModel() {
+function getUserDbModel(): Model<IUserDbConnection> {
   if (mongoose.connection.models["UserDbConnection"]) {
-    return mongoose.connection.models["UserDbConnection"];
+    return mongoose.connection.models[
+      "UserDbConnection"
+    ] as Model<IUserDbConnection>;
   }
-  const schema = new mongoose.Schema(
+
+  const schema = new Schema<IUserDbConnection>(
     {
       ownerId: { type: String, required: true, unique: true },
       encryptedUri: { type: String, required: true },
@@ -126,5 +137,9 @@ function getUserDbModel() {
     },
     { timestamps: true },
   );
-  return mongoose.connection.model("UserDbConnection", schema);
+
+  return mongoose.connection.model<IUserDbConnection>(
+    "UserDbConnection",
+    schema,
+  );
 }

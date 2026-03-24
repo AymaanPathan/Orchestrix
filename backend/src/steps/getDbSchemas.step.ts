@@ -1,7 +1,7 @@
 // src/steps/getDbSchemas.step.ts
 import { ApiRouteConfig, StepHandler } from "motia";
-import { connectMongo } from "../lib/mongo.js";
-import CollectionDefinitionsModel from "../models/CollectionDefinitions.model.js";
+import { connectMongo } from "../lib/mongo";
+import CollectionDefinitionsModel from "../models/CollectionDefinitions.model";
 
 export const config: ApiRouteConfig = {
   name: "getDbSchemas",
@@ -18,6 +18,8 @@ export const handler: StepHandler<typeof config> = async (req, ctx) => {
   const collections = await CollectionDefinitionsModel.find({}).lean();
 
   const schemas = collections.reduce<Record<string, string[]>>((acc, col) => {
+    if (!col.collectionName) return acc; // ✅ guard
+
     acc[col.collectionName] = Object.keys(col.fields || {});
     return acc;
   }, {});

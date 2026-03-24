@@ -1,7 +1,7 @@
 import { ApiRouteConfig, StepHandler } from "motia";
 import mongoose from "mongoose";
-import { connectMongo } from "../lib/mongo.js";
-import { evictUserConnection } from "../lib/userDbPool.js";
+import { connectMongo } from "../lib/mongo";
+import { evictUserConnection } from "../lib/userDbPool";
 
 export const config: ApiRouteConfig = {
   name: "disconnectUserDb",
