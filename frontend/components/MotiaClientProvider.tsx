@@ -1,6 +1,7 @@
 "use client";
 
 import { MotiaStreamProvider } from "@motiadev/stream-client-react";
+import { WS_BASE } from "../utils/api";
 
 export function MotiaClientProvider({
   children,
@@ -8,8 +9,6 @@ export function MotiaClientProvider({
   children: React.ReactNode;
 }) {
   return (
-    <MotiaStreamProvider address="ws://localhost:3000">
-      {children}
-    </MotiaStreamProvider>
+    <MotiaStreamProvider address={WS_BASE}>{children}</MotiaStreamProvider>
   );
 }

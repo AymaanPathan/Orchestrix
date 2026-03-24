@@ -8,17 +8,16 @@ import { EventHandler, ApiRouteHandler, ApiResponse, MotiaStream, CronHandler } 
 
 declare module 'motia' {
   interface FlowContextStateStreams {
-    'executionLog': MotiaStream<{ id: string; executionId: string; step: string; stepType: string; phase: 'start' | 'data' | 'result' | 'error' | 'end'; message: string; payload?: unknown; timestamp: number }>
+    'executionLog': MotiaStream<{ id?: string; executionId: string; step?: string; stepId?: string; stepIndex?: number; stepType?: string; phase?: 'start' | 'data' | 'result' | 'error' | 'end' | 'step_started' | 'step_finished' | 'execution_finished' | 'execution_failed'; level?: string; title?: string; message: string; payload?: unknown; input?: unknown; output?: unknown; data?: unknown; metadata?: unknown; index?: number; totalSteps?: number; durationMs?: number; startedAt?: number; timestamp: number }>
   }
 
   interface Handlers {
     'workflow.start': EventHandler<never, { topic: 'workflow.run'; data: never }>
-    'workflow.run': EventHandler<never, { topic: 'input'; data: never } | { topic: 'dbFind'; data: never } | { topic: 'dbInsert'; data: never } | { topic: 'dbUpdate'; data: never } | { topic: 'delay'; data: never } | { topic: 'authMiddleware'; data: never } | { topic: 'emailSend'; data: never } | { topic: 'inputValidation'; data: never }>
+    'workflow.run': EventHandler<never, { topic: 'input'; data: never } | { topic: 'dbFind'; data: never } | { topic: 'dbInsert'; data: never } | { topic: 'delay'; data: never } | { topic: 'authMiddleware'; data: never } | { topic: 'emailSend'; data: never } | { topic: 'inputValidation'; data: never }>
     'saveWorkflow': ApiRouteHandler<Record<string, unknown>, unknown, never>
     'runWorkflowPublic': ApiRouteHandler<Record<string, unknown>, unknown, never>
     'inputValidation': EventHandler<never, { topic: 'workflow.run'; data: never }>
     'input': EventHandler<never, { topic: 'workflow.run'; data: never }>
-    'getUserDbStatus': ApiRouteHandler<Record<string, unknown>, unknown, never>
     'getUserDbSchemas': ApiRouteHandler<Record<string, unknown>, unknown, never>
     'getDbSchemas': ApiRouteHandler<Record<string, unknown>, unknown, never>
     'generateWorkflow': ApiRouteHandler<Record<string, unknown>, unknown, never>
@@ -27,10 +26,8 @@ declare module 'motia' {
     'emailSend': EventHandler<never, { topic: 'workflow.run'; data: never }>
     'disconnectUserDb': ApiRouteHandler<Record<string, unknown>, unknown, never>
     'delay': EventHandler<never, never>
-    'dbUpdate': EventHandler<never, { topic: 'workflow.run'; data: never }>
     'dbInsert': EventHandler<never, { topic: 'workflow.run'; data: never }>
     'dbFind': EventHandler<never, { topic: 'workflow.run'; data: never }>
-    'connectUserDb': ApiRouteHandler<Record<string, unknown>, unknown, never>
     'authMiddleware': EventHandler<never, { topic: 'workflow.run'; data: never }>
     'ProcessGreeting': EventHandler<{ timestamp: string; appName: string; greetingPrefix: string; requestId: string }, never>
     'HelloAPI': ApiRouteHandler<Record<string, unknown>, ApiResponse<200, { message: string; status: string; appName: string }>, { topic: 'process-greeting'; data: { timestamp: string; appName: string; greetingPrefix: string; requestId: string } }>

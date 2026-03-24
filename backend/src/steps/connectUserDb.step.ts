@@ -2,7 +2,7 @@ import { ApiRouteConfig, StepHandler } from "motia";
 import mongoose from "mongoose";
 import dns from "dns";
 import { connectMongo } from "../lib/mongo.js";
-import { encrypt } from "../lib/crypto.js";
+import { encrypt } from "../lib/crypto";
 
 // ── Force Google DNS — fixes Windows ENOTFOUND on mongodb+srv:// URIs ────────
 dns.setDefaultResultOrder("ipv4first");

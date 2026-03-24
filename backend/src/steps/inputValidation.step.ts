@@ -1,6 +1,3 @@
-/* ------------------------------------------------------------
-   InputValidation Step (Motia EVENT)
--------------------------------------------------------------*/
 import { EventConfig, StepHandler } from "motia";
 import { logExecutionFailed, logExecutionFinished } from "../lib/logStep";
 import {
@@ -10,34 +7,19 @@ import {
   logError,
 } from "../lib/consoleLogger";
 
-/* ------------------------------------------------------------
-   Helpers
--------------------------------------------------------------*/
 function getValueByPath(obj: any, path: string) {
   return path.split(".").reduce((acc, key) => acc?.[key], obj);
 }
 
 function validateType(value: any, type?: string): string | null {
   if (!type) return null;
-
-  if (type === "number" && isNaN(Number(value))) {
-    return "Expected number";
-  }
-
-  if (type === "string" && typeof value !== "string") {
-    return "Expected string";
-  }
-
-  if (type === "boolean" && typeof value !== "boolean") {
+  if (type === "number" && isNaN(Number(value))) return "Expected number";
+  if (type === "string" && typeof value !== "string") return "Expected string";
+  if (type === "boolean" && typeof value !== "boolean")
     return "Expected boolean";
-  }
-
   return null;
 }
 
-/* ------------------------------------------------------------
-   Config
--------------------------------------------------------------*/
 export const config: EventConfig = {
   name: "inputValidation",
   type: "event",
@@ -45,9 +27,6 @@ export const config: EventConfig = {
   emits: ["workflow.run"],
 };
 
-/* ------------------------------------------------------------
-   Handler
--------------------------------------------------------------*/
 export const handler: StepHandler<typeof config> = async (payload, ctx) => {
   const start = Date.now();
   const { streams } = ctx;
@@ -59,14 +38,17 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
     index,
     vars,
     executionId,
-  } = payload;
+  } = payload as any;
+
+  const ownerId = (payload as any).ownerId || "default-owner";
+  const totalSteps = steps?.length || 0;
+  const isLastStep = index >= totalSteps - 1;
 
   try {
     logStepStart(index, "inputValidation");
     logKV("Rules", rules);
     logKV("Vars", vars);
 
-    // ───────── STREAM: START ─────────
     await streams.executionLog.set(
       executionId,
       `inputValidation-start-${index}`,
@@ -74,30 +56,27 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
         executionId,
         stepIndex: index,
         stepType: "inputValidation",
-        phase: "step_started",
+        phase: "start" as const,
         title: "Input validation started",
+        message: "Starting input validation",
         timestamp: Date.now(),
-      }
+      },
     );
 
     const errors: Record<string, string[]> = {};
 
     for (const rule of rules) {
       const { field, required, type } = rule;
-
-      // Resolve field path (supports input.name, input.email, etc.)
       const value = getValueByPath(vars, field);
 
       logKV(`Validating field: ${field}`, value);
 
-      // Required validation
       if (required && (value === undefined || value === "")) {
         if (!errors[field]) errors[field] = [];
         errors[field].push("Field is required");
         continue;
       }
 
-      // Type validation
       if (value !== undefined) {
         const typeError = validateType(value, type);
         if (typeError) {
@@ -107,7 +86,6 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
       }
     }
 
-    // ───────── STREAM: RESULT ─────────
     await streams.executionLog.set(
       executionId,
       `inputValidation-result-${index}`,
@@ -115,20 +93,17 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
         executionId,
         stepIndex: index,
         stepType: "inputValidation",
-        phase: "data",
+        phase: "data" as const,
         title: "Validation result",
-        data: {
-          ok: Object.keys(errors).length === 0,
-          errors,
-        },
+        message: `Validation ${Object.keys(errors).length === 0 ? "passed" : "failed"}`,
+        data: { ok: Object.keys(errors).length === 0, errors },
         timestamp: Date.now(),
-      }
+      },
     );
 
     if (Object.keys(errors).length > 0) {
       logError("inputValidation", errors);
 
-      // 🔴 STEP ERROR (UI RECOGNIZES THIS)
       await streams.executionLog.set(
         executionId,
         `inputValidation-error-${index}`,
@@ -136,29 +111,27 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
           executionId,
           stepIndex: index,
           stepType: "inputValidation",
-          phase: "error",
+          phase: "error" as const,
           title: "Input validation failed",
+          message: "One or more fields failed validation",
           data: errors,
           durationMs: Date.now() - start,
           timestamp: Date.now(),
-        }
+        },
       );
 
-      // 🔴 EXECUTION FAILED (THIS STOPS UI SPINNER)
       await logExecutionFailed(streams, {
         executionId,
         failedStepIndex: index,
-        totalSteps: steps?.length || 0,
+        totalSteps,
         error: "Input validation failed",
       });
 
       throw new Error("Input validation failed");
     }
-    const totalSteps = steps?.length || 0;
-    const isLastStep = index >= totalSteps - 1;
 
-    // ✅ Validation passed
     logSuccess("inputValidation", Date.now() - start);
+
     await streams.executionLog.set(
       executionId,
       `inputValidation-end-${index}`,
@@ -166,11 +139,12 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
         executionId,
         stepIndex: index,
         stepType: "inputValidation",
-        phase: "step_finished", // ✅ IMPORTANT
+        phase: "end" as const,
         title: "Input validation completed",
+        message: "All fields passed validation",
         durationMs: Date.now() - start,
         timestamp: Date.now(),
-      }
+      },
     );
 
     if (isLastStep) {
@@ -179,24 +153,15 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
         totalSteps,
         startedAt: start,
       });
-      return; // ⛔ DO NOT emit workflow.run
+      return;
     }
 
-    // 🔁 Continue workflow
-    // Take original input object
+    // Flatten input fields into vars so downstream steps can access them directly
     const inputData = vars.input || {};
-
-    // Re-emit validated data
-    const nextVars = {
+    const nextVars: any = {
       ...vars,
-
-      // optional grouped object
-      [output]: {
-        ok: true,
-      },
+      [output]: { ok: true },
     };
-
-    // 🔥 FLATTEN INPUT FIELDS (THIS IS WHAT YOU WANT)
     Object.keys(inputData).forEach((key) => {
       nextVars[key] = inputData[key];
     });
@@ -208,6 +173,7 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
         index: index + 1,
         vars: nextVars,
         executionId,
+        ownerId,
       },
     });
   } catch (err) {

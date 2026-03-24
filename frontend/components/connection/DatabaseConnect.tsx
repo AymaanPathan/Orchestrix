@@ -13,6 +13,7 @@ import {
   Shield,
   Zap,
 } from "lucide-react";
+import { apiUrl } from "../../utils/api";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -38,8 +39,6 @@ interface DatabaseConnectProps {
   onDisconnected?: () => void;
 }
 
-// ── Animation Steps ──────────────────────────────────────────────────────────
-
 const PHASES: { phase: Phase; label: string; sublabel: string }[] = [
   {
     phase: "validating",
@@ -61,11 +60,7 @@ const PHASES: { phase: Phase; label: string; sublabel: string }[] = [
     label: "Reading schemas",
     sublabel: "Discovering your collections...",
   },
-  {
-    phase: "done",
-    label: "Connected",
-    sublabel: "Your database is ready.",
-  },
+  { phase: "done", label: "Connected", sublabel: "Your database is ready." },
 ];
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -84,39 +79,30 @@ export function DatabaseConnect({
   const [completedPhases, setCompletedPhases] = useState<Phase[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Load current status on mount
   useEffect(() => {
     fetchStatus();
   }, [ownerId]);
-
   useEffect(() => {
-    if (showModal && phase === "idle") {
+    if (showModal && phase === "idle")
       setTimeout(() => inputRef.current?.focus(), 50);
-    }
   }, [showModal, phase]);
 
   async function fetchStatus() {
     try {
-      const res = await fetch(
-        `http://localhost:3000/user/db/status?ownerId=${ownerId}`,
-      );
+      const res = await fetch(apiUrl(`/user/db/status?ownerId=${ownerId}`));
       const data = await res.json();
       setStatus(data);
     } catch {
-      // Silently fail — no connection yet
+      /* silently fail */
     }
   }
 
-  // ── Connection flow ──────────────────────────────────────────────────────
-
   async function handleConnect() {
     if (!uri.trim()) return;
-
     setPhase("validating");
     setCompletedPhases([]);
     setErrorMsg("");
 
-    // Stagger the phase animations so they feel real, not instant
     const phaseDurations: Record<Phase, number> = {
       idle: 0,
       validating: 600,
@@ -126,7 +112,6 @@ export function DatabaseConnect({
       done: 0,
       error: 0,
     };
-
     const advancePhase = async (next: Phase) => {
       await sleep(phaseDurations[next] || 600);
       setPhase(next);
@@ -136,41 +121,33 @@ export function DatabaseConnect({
     try {
       await advancePhase("connecting");
 
-      // ── Real API call ─────────────────────────────────────────────────────
-      const res = await fetch("http://localhost:3000/user/db/connect", {
+      const res = await fetch(apiUrl("/user/db/connect"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ownerId, uri: uri.trim(), label: label.trim() }),
       });
-
       const data = await res.json();
-
-      if (!res.ok || !data.ok) {
+      if (!res.ok || !data.ok)
         throw new Error(data.detail || data.error || "Connection failed");
-      }
 
       await advancePhase("authenticating");
       await advancePhase("fetching_schemas");
 
-      // Fetch schemas now that we're connected
       const schemaRes = await fetch(
-        `http://localhost:3000/user/db/schemas?ownerId=${ownerId}`,
+        apiUrl(`/user/db/schemas?ownerId=${ownerId}`),
       );
       const schemaData = await schemaRes.json();
 
       setPhase("done");
       setCompletedPhases(PHASES.map((p) => p.phase));
-
       await sleep(800);
 
-      // Update top-level status
       await fetchStatus();
       setShowModal(false);
       setPhase("idle");
       setUri("");
       setLabel("");
       setCompletedPhases([]);
-
       onConnected?.(schemaData.schemas || {});
     } catch (err: any) {
       setPhase("error");
@@ -182,7 +159,7 @@ export function DatabaseConnect({
 
   async function handleDisconnect() {
     try {
-      await fetch("http://localhost:3000/user/db/disconnect", {
+      await fetch(apiUrl("/user/db/disconnect"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ownerId }),
@@ -190,12 +167,12 @@ export function DatabaseConnect({
       setStatus(null);
       onDisconnected?.();
     } catch {
-      // ignore
+      /* ignore */
     }
   }
 
   function handleClose() {
-    if (phase !== "idle" && phase !== "error" && phase !== "done") return; // Prevent closing mid-connect
+    if (phase !== "idle" && phase !== "error" && phase !== "done") return;
     setShowModal(false);
     setPhase("idle");
     setUri("");
@@ -207,11 +184,8 @@ export function DatabaseConnect({
   const isConnecting =
     phase !== "idle" && phase !== "done" && phase !== "error";
 
-  // ── Render ────────────────────────────────────────────────────────────────
-
   return (
     <>
-      {/* ── Trigger button ───────────────────────────────────────────────── */}
       {status?.connected ? (
         <ConnectedPill
           label={status.label || "Database"}
@@ -222,10 +196,11 @@ export function DatabaseConnect({
       ) : (
         <button
           onClick={() => setShowModal(true)}
-          className="group flex items-center gap-2 px-4 py-2 text-[13px] font-medium text-white/60 hover:text-white bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.08] hover:border-white/[0.14] rounded-lg transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] backdrop-blur-xl"
+          className="group flex items-center gap-2 px-3 sm:px-4 py-2 text-[13px] font-medium text-white/60 hover:text-white bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.08] hover:border-white/[0.14] rounded-lg transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] backdrop-blur-xl"
         >
           <Database size={15} strokeWidth={1.5} />
-          Connect Database
+          <span className="hidden sm:inline">Connect Database</span>
+          <span className="sm:hidden">Connect DB</span>
           <ChevronRight
             size={13}
             className="opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all duration-300"
@@ -233,29 +208,21 @@ export function DatabaseConnect({
         </button>
       )}
 
-      {/* ── Modal ────────────────────────────────────────────────────────── */}
       {showModal && (
         <>
-          {/* Backdrop */}
           <div
             onClick={handleClose}
             className="fixed inset-0 bg-black/80 backdrop-blur-xl z-[100] animate-db-fade-in"
           />
-
-          {/* Panel */}
-          <div className="fixed inset-0 z-[101] flex items-center justify-center p-4 animate-db-modal-in">
+          <div className="fixed inset-0 z-[101] flex items-center justify-center p-3 sm:p-4 animate-db-modal-in">
             <div className="relative w-full max-w-lg">
-              {/* Glow */}
               <div className="absolute inset-0 bg-white/[0.02] rounded-2xl blur-3xl" />
-
-              <div className="relative bg-[#090909]/98 border border-white/[0.1] rounded-2xl shadow-2xl backdrop-blur-2xl overflow-hidden">
-                {/* Top highlight line */}
+              <div className="relative bg-[#090909]/98 border border-white/[0.1] rounded-2xl shadow-2xl backdrop-blur-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
                 <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-white/[0.15] to-transparent" />
 
-                {/* Header */}
-                <div className="px-6 py-5 border-b border-white/[0.05] flex items-center justify-between">
+                <div className="px-5 sm:px-6 py-4 sm:py-5 border-b border-white/[0.05] flex items-center justify-between sticky top-0 bg-[#090909]/98 z-10">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-white/[0.05] border border-white/[0.08] flex items-center justify-center">
+                    <div className="w-8 h-8 rounded-lg bg-white/[0.05] border border-white/[0.08] flex items-center justify-center shrink-0">
                       <Database
                         size={15}
                         strokeWidth={1.5}
@@ -274,14 +241,13 @@ export function DatabaseConnect({
                   <button
                     onClick={handleClose}
                     disabled={isConnecting}
-                    className="p-1.5 hover:bg-white/[0.06] rounded-lg transition-all duration-200 disabled:opacity-30"
+                    className="p-1.5 hover:bg-white/[0.06] rounded-lg transition-all duration-200 disabled:opacity-30 shrink-0"
                   >
                     <X size={15} className="text-white/40" strokeWidth={1.5} />
                   </button>
                 </div>
 
-                {/* Body */}
-                <div className="p-6">
+                <div className="p-5 sm:p-6">
                   {phase === "idle" || phase === "error" ? (
                     <IdleForm
                       inputRef={inputRef}
@@ -301,13 +267,12 @@ export function DatabaseConnect({
                   )}
                 </div>
 
-                {/* Security note */}
                 {(phase === "idle" || phase === "error") && (
-                  <div className="px-6 pb-5">
+                  <div className="px-5 sm:px-6 pb-4 sm:pb-5">
                     <div className="flex items-center gap-2 text-[11px] text-white/20 font-light">
                       <Shield size={11} strokeWidth={1.5} />
                       <span>
-                        URI is encrypted with AES-256 and never logged or shared
+                        URI encrypted with AES-256 — never logged or shared
                       </span>
                     </div>
                   </div>
@@ -337,7 +302,6 @@ function IdleForm({
 }: any) {
   return (
     <div className="space-y-4">
-      {/* Label */}
       <div>
         <label className="block text-[11px] text-white/30 mb-2 tracking-wider uppercase font-medium">
           Connection label
@@ -350,8 +314,6 @@ function IdleForm({
           className="w-full px-3.5 py-2.5 bg-white/[0.03] border border-white/[0.07] hover:border-white/[0.11] rounded-lg text-[13px] text-white placeholder-white/20 focus:outline-none focus:border-white/[0.16] focus:bg-white/[0.04] transition-all duration-200"
         />
       </div>
-
-      {/* URI */}
       <div>
         <label className="block text-[11px] text-white/30 mb-2 tracking-wider uppercase font-medium">
           MongoDB URI
@@ -370,8 +332,6 @@ function IdleForm({
           className="w-full px-3.5 py-2.5 bg-white/[0.03] border border-white/[0.07] hover:border-white/[0.11] rounded-lg text-[13px] text-white placeholder-white/20 font-mono focus:outline-none focus:border-white/[0.16] focus:bg-white/[0.04] transition-all duration-200"
         />
       </div>
-
-      {/* Error */}
       {errorMsg && (
         <div className="flex items-start gap-2.5 px-3.5 py-3 bg-red-500/[0.06] border border-red-500/[0.12] rounded-lg animate-db-fade-in">
           <AlertCircle
@@ -384,9 +344,7 @@ function IdleForm({
           </p>
         </div>
       )}
-
-      {/* Helper */}
-      <div className="flex items-center gap-1.5 text-[11px] text-white/20 px-0.5">
+      <div className="flex items-center gap-1.5 text-[11px] text-white/20 px-0.5 flex-wrap gap-y-1">
         <Zap size={10} strokeWidth={1.5} />
         <span>We&apos;ll verify the connection before saving</span>
         <span className="ml-auto flex items-center gap-1.5">
@@ -396,8 +354,6 @@ function IdleForm({
           to connect
         </span>
       </div>
-
-      {/* Actions */}
       <div className="flex gap-2.5 pt-1">
         <button
           onClick={onCancel}
@@ -430,10 +386,8 @@ function ConnectingAnimation({
 
   return (
     <div className="py-4">
-      {/* Current phase label */}
       <div className="text-center mb-8">
         <div className="relative inline-flex items-center justify-center w-14 h-14 mb-4">
-          {/* Pulse ring */}
           {phase !== "done" && (
             <div className="absolute inset-0 rounded-full bg-white/[0.04] animate-db-ping" />
           )}
@@ -453,7 +407,6 @@ function ConnectingAnimation({
             )}
           </div>
         </div>
-
         <p className="text-[15px] font-medium text-white tracking-tight">
           {currentPhaseData?.label}
         </p>
@@ -461,38 +414,23 @@ function ConnectingAnimation({
           {currentPhaseData?.sublabel}
         </p>
       </div>
-
-      {/* Step list */}
       <div className="space-y-1">
         {displayPhases.map((p, i) => {
           const isCompleted = completedPhases.includes(p.phase);
           const isCurrent = phase === p.phase;
-          const isPending = !isCompleted && !isCurrent;
-
           return (
             <div
               key={p.phase}
-              className={`flex items-center gap-3 px-3.5 py-2.5 rounded-lg transition-all duration-500 ${
-                isCurrent
-                  ? "bg-white/[0.04] border border-white/[0.07]"
-                  : isCompleted
-                    ? "bg-transparent"
-                    : "opacity-30"
-              }`}
+              className={`flex items-center gap-3 px-3.5 py-2.5 rounded-lg transition-all duration-500 ${isCurrent ? "bg-white/[0.04] border border-white/[0.07]" : isCompleted ? "" : "opacity-30"}`}
               style={{ transitionDelay: `${i * 40}ms` }}
             >
-              {/* Status indicator */}
               <div className="shrink-0 w-5 h-5 flex items-center justify-center">
-                {isCompleted && phase !== "done" ? (
+                {isCompleted ? (
                   <CheckCircle
                     size={14}
-                    className="text-white/50"
-                    strokeWidth={1.5}
-                  />
-                ) : isCompleted && phase === "done" ? (
-                  <CheckCircle
-                    size={14}
-                    className="text-white/70"
+                    className={
+                      phase === "done" ? "text-white/70" : "text-white/50"
+                    }
                     strokeWidth={1.5}
                   />
                 ) : isCurrent ? (
@@ -505,21 +443,13 @@ function ConnectingAnimation({
                   <div className="w-1.5 h-1.5 rounded-full bg-white/20" />
                 )}
               </div>
-
               <span
-                className={`text-[12px] transition-colors duration-300 ${
-                  isCompleted
-                    ? "text-white/50"
-                    : isCurrent
-                      ? "text-white/80"
-                      : "text-white/20"
-                }`}
+                className={`text-[12px] transition-colors duration-300 ${isCompleted ? "text-white/50" : isCurrent ? "text-white/80" : "text-white/20"}`}
               >
                 {p.label}
               </span>
-
               {isCurrent && (
-                <span className="ml-auto text-[10px] text-white/20 font-light">
+                <span className="ml-auto text-[10px] text-white/20 font-light hidden sm:block">
                   {p.sublabel}
                 </span>
               )}
@@ -543,33 +473,30 @@ function ConnectedPill({
   onClick: () => void;
 }) {
   const [showMenu, setShowMenu] = useState(false);
-
   return (
     <div className="relative">
       <button
         onClick={() => setShowMenu((v) => !v)}
-        className="group flex items-center gap-2 px-3.5 py-2 text-[13px] text-white/70 hover:text-white bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.08] hover:border-white/[0.13] rounded-lg transition-all duration-200"
+        className="group flex items-center gap-2 px-3 sm:px-3.5 py-2 text-[13px] text-white/70 hover:text-white bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.08] hover:border-white/[0.13] rounded-lg transition-all duration-200"
       >
-        {/* Alive indicator */}
-        <span className="relative flex h-1.5 w-1.5">
+        <span className="relative flex h-1.5 w-1.5 shrink-0">
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white/40 opacity-75" />
           <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white/60" />
         </span>
-        <Database size={14} strokeWidth={1.5} />
-        <span className="max-w-[140px] truncate">{label}</span>
+        <Database size={14} strokeWidth={1.5} className="shrink-0" />
+        <span className="max-w-[80px] sm:max-w-[140px] truncate">{label}</span>
         <ChevronRight
           size={12}
-          className={`opacity-40 transition-transform duration-200 ${showMenu ? "rotate-90" : ""}`}
+          className={`opacity-40 transition-transform duration-200 shrink-0 ${showMenu ? "rotate-90" : ""}`}
         />
       </button>
-
       {showMenu && (
         <>
           <div
             className="fixed inset-0 z-[50]"
             onClick={() => setShowMenu(false)}
           />
-          <div className="absolute top-full mt-2 left-0 z-[51] w-64 bg-[#0A0A0A]/98 border border-white/[0.1] rounded-xl shadow-2xl backdrop-blur-2xl overflow-hidden animate-db-fade-in">
+          <div className="absolute top-full mt-2 left-0 z-[51] w-56 sm:w-64 bg-[#0A0A0A]/98 border border-white/[0.1] rounded-xl shadow-2xl backdrop-blur-2xl overflow-hidden animate-db-fade-in">
             <div className="p-3 border-b border-white/[0.05]">
               <p className="text-[12px] text-white/60 font-medium">{label}</p>
               {uriMasked && (
@@ -597,27 +524,14 @@ function ConnectedPill({
   );
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-// ── Styles ────────────────────────────────────────────────────────────────────
-
 const dbModalStyles = `
-  @keyframes db-fade-in {
-    from { opacity: 0; }
-    to { opacity: 1; }
-  }
-  @keyframes db-modal-in {
-    from { opacity: 0; transform: scale(0.97) translateY(12px); }
-    to   { opacity: 1; transform: scale(1) translateY(0); }
-  }
-  @keyframes db-ping {
-    75%, 100% { transform: scale(2); opacity: 0; }
-  }
-
+  @keyframes db-fade-in  { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes db-modal-in { from { opacity: 0; transform: scale(0.97) translateY(12px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+  @keyframes db-ping     { 75%, 100% { transform: scale(2); opacity: 0; } }
   .animate-db-fade-in  { animation: db-fade-in  0.2s ease-out both; }
   .animate-db-modal-in { animation: db-modal-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) both; }
   .animate-db-ping     { animation: db-ping 1.4s cubic-bezier(0, 0, 0.2, 1) infinite; }

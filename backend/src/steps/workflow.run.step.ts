@@ -29,14 +29,13 @@ export const handler: StepHandler<typeof config> = async (
   ctx,
 ) => {
   const { steps, index, vars, executionId, ownerId } = payload;
-
   const { streams } = ctx;
 
   // ✅ Workflow finished
   if (index >= steps.length) {
     await streams.executionLog.set(executionId, `finish-${Date.now()}`, {
       executionId,
-      level: "info",
+      phase: "execution_finished",
       message: "Workflow finished",
       timestamp: Date.now(),
     });
@@ -54,21 +53,14 @@ export const handler: StepHandler<typeof config> = async (
     executionId,
   );
 
-  // ✅ STREAM LOG TO FRONTEND
   await streams.executionLog.set(executionId, `step-${index}-${Date.now()}`, {
     executionId,
-    level: "info",
-    message: `Executing step ${index}: ${step.type}`,
+    phase: "start",
     step: step.type,
-    index,
+    stepIndex: index,
+    message: `Executing step ${index}: ${step.type}`,
     timestamp: Date.now(),
   });
-
-  if (index >= steps.length) {
-    console.log("\n✅ WORKFLOW FINISHED SUCCESSFULLY");
-    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    return;
-  }
 
   if (["emailSend", "dbInsert", "dbUpdate"].includes(step.type)) {
     assertNoUndefined(step, step.type);
@@ -81,6 +73,7 @@ export const handler: StepHandler<typeof config> = async (
       );
     }
   }
+
   await ctx.emit({
     topic: step.type,
     data: {

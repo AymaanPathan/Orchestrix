@@ -4,8 +4,8 @@
  * Connections are cached by ownerId — no reconnect on every request.
  */
 import mongoose from "mongoose";
-import { connectMongo } from "./mongo.js";
-import { decrypt } from "./crypto.js";
+import { connectMongo } from "./mongo";
+import { decrypt } from "./crypto";
 
 const pool = new Map<string, mongoose.Connection>();
 

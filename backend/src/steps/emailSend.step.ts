@@ -29,21 +29,20 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
   const { streams } = ctx;
 
   const { to, subject, body, output, steps, index, vars, executionId } =
-    payload;
+    payload as any;
 
+  const ownerId = (payload as any).ownerId || "default-owner";
   const totalSteps = steps?.length || 0;
   const isLastStep = index >= totalSteps - 1;
   const stepId = `emailsend-${index}`;
 
   try {
-    // Console logs
     logStepStart(index, "emailSend");
     logKV("Raw recipient", to);
     logKV("Raw subject", subject);
     logKV("Raw body", body);
     logKV("Vars", vars);
 
-    // ───────────────── STREAM: STEP STARTED ─────────────────
     await logStepStartStream(streams, {
       executionId,
       stepId,
@@ -54,7 +53,6 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
       input: { to, subject, body: body?.substring(0, 100) + "..." },
     });
 
-    // ───────────────── STREAM: RESOLVING VARIABLES ─────────────────
     await logStepInfo(streams, {
       executionId,
       stepId,
@@ -65,7 +63,6 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
       data: { rawTo: to, rawSubject: subject },
     });
 
-    // 🔁 Resolve {{variables}} using runtime vars
     const resolvedTo = resolveObject(vars, to);
     const resolvedSubject = resolveObject(vars, subject);
     const resolvedBody = resolveObject(vars, body);
@@ -73,7 +70,6 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
     logKV("Resolved recipient", resolvedTo);
     logKV("Resolved subject", resolvedSubject);
 
-    // ───────────────── STREAM: VARIABLES RESOLVED ─────────────────
     await logStepData(streams, {
       executionId,
       stepId,
@@ -88,7 +84,6 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
       },
     });
 
-    // ───────────────── STREAM: VALIDATION ─────────────────
     await logStepInfo(streams, {
       executionId,
       stepId,
@@ -102,7 +97,6 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
       throw new Error("emailSend requires to, subject, body");
     }
 
-    // ───────────────── STREAM: SENDING EMAIL ─────────────────
     await logStepInfo(streams, {
       executionId,
       stepId,
@@ -110,10 +104,7 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
       stepType: "emailSend",
       title: "Sending email",
       message: `Sending email to ${resolvedTo}...`,
-      data: {
-        recipient: resolvedTo,
-        subject: resolvedSubject,
-      },
+      data: { recipient: resolvedTo, subject: resolvedSubject },
     });
 
     const result = await sendEmail({
@@ -128,7 +119,6 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
 
     logKV("Email result", result);
 
-    // ───────────────── STREAM: EMAIL SENT ─────────────────
     await logStepData(streams, {
       executionId,
       stepId,
@@ -155,7 +145,6 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
       subject: resolvedSubject,
     };
 
-    // ───────────────── STREAM: STEP FINISHED ─────────────────
     await logStepSuccess(streams, {
       executionId,
       stepId,
@@ -165,16 +154,12 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
       message: "Email step completed successfully",
       output: emailResult,
       data: emailResult,
-      metadata: {
-        messageId: result.messageId,
-        recipient: resolvedTo,
-      },
+      metadata: { messageId: result.messageId, recipient: resolvedTo },
       startedAt,
     });
 
     logSuccess("emailSend", Date.now() - startedAt);
 
-    // ───────────────── STREAM: EXECUTION FINISHED (if last step) ─────────────────
     if (isLastStep) {
       await logExecutionFinished(streams, {
         executionId,
@@ -183,23 +168,19 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
       });
     }
 
-    // 🔁 Continue workflow
     await ctx.emit({
       topic: "workflow.run",
       data: {
         steps,
         index: index + 1,
-        vars: {
-          ...vars,
-          [output || "emailResult"]: emailResult,
-        },
+        vars: { ...vars, [output || "emailResult"]: emailResult },
         executionId,
+        ownerId,
       },
     });
   } catch (err) {
     logError("emailSend", err);
 
-    // ───────────────── STREAM: STEP ERROR ─────────────────
     await logStepError(streams, {
       executionId,
       stepId,
@@ -207,15 +188,10 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
       stepType: "emailSend",
       totalSteps,
       error: String(err),
-      data: {
-        to,
-        subject,
-        bodyPreview: body?.substring(0, 100),
-      },
+      data: { to, subject, bodyPreview: body?.substring(0, 100) },
       startedAt,
     });
 
-    // ───────────────── STREAM: EXECUTION FAILED ─────────────────
     await logExecutionFailed(streams, {
       executionId,
       failedStepIndex: index,

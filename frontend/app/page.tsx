@@ -23,10 +23,8 @@ import {
   ChevronRight,
   Server,
   Table2,
-  Clock,
   Unplug,
 } from "lucide-react";
-import Link from "next/link";
 import { RootDispatch, RootState } from "@/store";
 import { useDispatch, useSelector } from "react-redux";
 import {
@@ -35,6 +33,7 @@ import {
   clearDbSchemas,
 } from "@/store/dbSchemasSlice";
 import { AIGenerationScreen } from "@/components/workflow/AIGenerationScreen";
+import { apiUrl } from "../utils/api";
 
 // ── DB Connection types ───────────────────────────────────────────────────────
 
@@ -81,10 +80,9 @@ export default function LandingPage() {
   );
   const ownerId = useSelector((state: RootState) => state.dbSchemas.ownerId);
 
-  // ── UI state ─────────────────────────────────────────────────────────────
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  // Step 1: DB connect modal
+  // DB connect modal
   const [showDbModal, setShowDbModal] = useState(false);
   const [dbUri, setDbUri] = useState("");
   const [dbLabelInput, setDbLabelInput] = useState("");
@@ -96,9 +94,8 @@ export default function LandingPage() {
   );
   const uriInputRef = useRef<HTMLInputElement>(null);
 
-  // Step 2: DB info confirm modal
+  // DB info confirm modal
   const [showDbInfoModal, setShowDbInfoModal] = useState(false);
-  // What the user wanted to do next (stored while we gate them)
   const [pendingAction, setPendingAction] = useState<"ai" | "manual" | null>(
     null,
   );
@@ -113,23 +110,17 @@ export default function LandingPage() {
   useEffect(() => {
     dispatch(fetchDbSchemas());
   }, [dispatch]);
-
   useEffect(() => {
-    if (showDbModal && connectPhase === "idle") {
+    if (showDbModal && connectPhase === "idle")
       setTimeout(() => uriInputRef.current?.focus(), 60);
-    }
   }, [showDbModal, connectPhase]);
-
-  // ── Helpers ───────────────────────────────────────────────────────────────
 
   function sleep(ms: number) {
     return new Promise((r) => setTimeout(r, ms));
   }
 
-  /** Gate: if already connected skip straight to action, else show DB modal */
   function requireDb(action: "ai" | "manual") {
     if (isConnected) {
-      // Already connected — show info confirmation modal
       setPendingAction(action);
       setShowDbInfoModal(true);
     } else {
@@ -138,27 +129,22 @@ export default function LandingPage() {
     }
   }
 
-  /** After user confirms DB info, proceed with their intended action */
   function proceedWithAction() {
     setShowDbInfoModal(false);
-    if (pendingAction === "ai") {
-      setShowAIModal(true);
-    } else if (pendingAction === "manual") {
-      window.location.href = "/builder";
-    }
+    if (pendingAction === "ai") setShowAIModal(true);
+    else if (pendingAction === "manual") window.location.href = "/builder";
     setPendingAction(null);
   }
 
-  // ── DB Connection flow ────────────────────────────────────────────────────
+  // ── DB Connection ─────────────────────────────────────────────────────────
 
   async function handleConnect() {
     if (!dbUri.trim()) return;
     setConnectPhase("connecting");
     setCompletedPhases([]);
     setConnectError("");
-
     try {
-      const res = await fetch("http://localhost:3000/user/db/connect", {
+      const res = await fetch(apiUrl("/user/db/connect"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -174,13 +160,12 @@ export default function LandingPage() {
       await sleep(700);
       setConnectPhase("authenticating");
       setCompletedPhases(["connecting"]);
-
       await sleep(700);
       setConnectPhase("fetching_schemas");
       setCompletedPhases(["connecting", "authenticating"]);
 
       const schemaRes = await fetch(
-        `http://localhost:3000/user/db/schemas?ownerId=${ownerId}`,
+        apiUrl(`/user/db/schemas?ownerId=${ownerId}`),
       );
       const schemaData = await schemaRes.json();
       const schemas = schemaData.schemas || {};
@@ -195,7 +180,6 @@ export default function LandingPage() {
       ]);
       setFreshSchemas(schemas);
 
-      // Persist to Redux
       dispatch(
         setUserDbConnected({
           schemas,
@@ -205,8 +189,6 @@ export default function LandingPage() {
       );
 
       await sleep(900);
-
-      // Close DB modal, open info modal
       setShowDbModal(false);
       setConnectPhase("idle");
       setDbUri("");
@@ -222,7 +204,7 @@ export default function LandingPage() {
   }
 
   async function handleDisconnect() {
-    await fetch("http://localhost:3000/user/db/disconnect", {
+    await fetch(apiUrl("/user/db/disconnect"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ownerId }),
@@ -237,7 +219,7 @@ export default function LandingPage() {
     if (!prompt) return;
     setIsGenerating(true);
     try {
-      const res = await fetch("http://localhost:3000/workflow/generate", {
+      const res = await fetch(apiUrl("/workflow/generate"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt }),
@@ -245,7 +227,6 @@ export default function LandingPage() {
       const ai = await res.json();
       if (!ai.nodes || !ai.edges)
         throw new Error("Invalid AI workflow returned");
-
       sessionStorage.setItem(
         "aiWorkflow",
         JSON.stringify({
@@ -262,7 +243,6 @@ export default function LandingPage() {
           })),
         }),
       );
-
       setGenerationDone(true);
     } finally {
       setIsGenerating(false);
@@ -300,8 +280,6 @@ export default function LandingPage() {
     isConnected ? schemas : freshSchemas,
   ).length;
 
-  // ── Render ────────────────────────────────────────────────────────────────
-
   if (showGenerationScreen) {
     return (
       <AIGenerationScreen
@@ -325,25 +303,22 @@ export default function LandingPage() {
           }}
         />
       </div>
-      <div className="fixed inset-0 opacity-[0.02] pointer-events-none mix-blend-overlay">
-        <div className="absolute inset-0 bg-noise" />
-      </div>
 
       {/* Nav */}
       <nav className="fixed top-0 left-0 right-0 z-50 animate-slide-down">
         <div className="absolute inset-0 bg-black/60 backdrop-blur-2xl border-b border-white/[0.06]" />
-        <div className="relative max-w-7xl mx-auto px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16 lg:h-18">
-            <div className="flex items-center gap-2.5 group cursor-pointer">
-              <div className="w-8 h-8 rounded-lg bg-white/[0.08] border border-white/[0.12] flex items-center justify-center backdrop-blur-xl group-hover:bg-white/[0.12] transition-all duration-300">
-                <Workflow size={16} className="text-white" strokeWidth={1.5} />
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-14 sm:h-16">
+            <div className="flex items-center gap-2 sm:gap-2.5 group cursor-pointer">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-white/[0.08] border border-white/[0.12] flex items-center justify-center backdrop-blur-xl group-hover:bg-white/[0.12] transition-all duration-300">
+                <Workflow size={14} className="text-white" strokeWidth={1.5} />
               </div>
-              <span className="text-[15px] font-medium tracking-tight">
+              <span className="text-[14px] sm:text-[15px] font-medium tracking-tight">
                 Orchestrix
               </span>
             </div>
 
-            {/* DB status pill in nav */}
+            {/* DB pill — hidden on very small screens */}
             {isConnected && (
               <button
                 onClick={() => {
@@ -361,34 +336,74 @@ export default function LandingPage() {
                   strokeWidth={1.5}
                   className="text-white/50"
                 />
-                <span className="text-[12px] text-white/50 max-w-[120px] truncate">
+                <span className="text-[12px] text-white/50 max-w-[100px] truncate">
                   {dbLabel}
                 </span>
               </button>
             )}
 
+            {/* Mobile menu toggle */}
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               className="lg:hidden p-2 hover:bg-white/[0.08] rounded-lg transition-all duration-300"
             >
               {isMenuOpen ? (
-                <X size={20} strokeWidth={1.5} />
+                <X size={18} strokeWidth={1.5} />
               ) : (
-                <Menu size={20} strokeWidth={1.5} />
+                <Menu size={18} strokeWidth={1.5} />
               )}
             </button>
           </div>
         </div>
+
+        {/* Mobile menu */}
+        {isMenuOpen && (
+          <div className="lg:hidden absolute top-full left-0 right-0 bg-black/95 backdrop-blur-2xl border-b border-white/[0.06] px-4 py-4 space-y-2 animate-lp-fade">
+            {isConnected && (
+              <button
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  setPendingAction(null);
+                  setShowDbInfoModal(true);
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2.5 text-[13px] text-white/60 hover:text-white bg-white/[0.03] rounded-lg transition-all"
+              >
+                <Database size={14} strokeWidth={1.5} />
+                {dbLabel}
+                <span className="ml-auto text-[11px] text-white/30">
+                  connected
+                </span>
+              </button>
+            )}
+            <button
+              onClick={() => {
+                setIsMenuOpen(false);
+                requireDb("ai");
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2.5 text-[13px] font-medium text-black bg-white rounded-lg"
+            >
+              <Brain size={15} strokeWidth={2} /> Generate with AI
+            </button>
+            <button
+              onClick={() => {
+                setIsMenuOpen(false);
+                requireDb("manual");
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2.5 text-[13px] text-white/70 bg-white/[0.04] border border-white/[0.08] rounded-lg"
+            >
+              <Play size={15} strokeWidth={2} /> Build Manually
+            </button>
+          </div>
+        )}
       </nav>
 
       {/* Hero */}
-      <section className="relative min-h-screen flex items-center justify-center px-6 pt-20">
+      <section className="relative min-h-screen flex items-center justify-center px-4 sm:px-6 pt-16 sm:pt-20">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-white/[0.03] rounded-full blur-[120px]" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] sm:w-[800px] h-[400px] sm:h-[800px] bg-white/[0.03] rounded-full blur-[120px]" />
         </div>
-
-        <div className="relative text-center animate-fade-in-up">
-          <h1 className="text-5xl sm:text-6xl lg:text-[76px] font-semibold mb-6 leading-[1.06] tracking-[-0.02em]">
+        <div className="relative text-center animate-fade-in-up w-full max-w-4xl mx-auto">
+          <h1 className="text-4xl sm:text-5xl lg:text-[76px] font-semibold mb-5 sm:mb-6 leading-[1.06] tracking-[-0.02em]">
             <span className="inline-block animate-fade-in-up">
               Build APIs without
             </span>
@@ -397,48 +412,40 @@ export default function LandingPage() {
               writing code
             </span>
           </h1>
-
-          <p className="text-lg sm:text-xl text-white/40 mb-12 max-w-2xl mx-auto leading-relaxed font-light animate-fade-in-up animation-delay-200">
+          <p className="text-base sm:text-lg lg:text-xl text-white/40 mb-10 sm:mb-12 max-w-2xl mx-auto leading-relaxed font-light animate-fade-in-up animation-delay-200 px-2">
             Connect nodes, define logic, and deploy production-ready APIs
             instantly. Let AI generate workflows or build manually.
           </p>
-
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 animate-fade-in-up animation-delay-300">
-            {/* Generate with AI — gates on DB */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 animate-fade-in-up animation-delay-300 px-4 sm:px-0">
             <button
               onClick={() => requireDb("ai")}
-              className="group px-6 py-3 text-[14px] font-medium text-black bg-white hover:bg-white/90 rounded-lg w-full sm:w-auto justify-center transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] shadow-[0_0_40px_rgba(255,255,255,0.1)]"
+              className="group px-6 py-3 text-[14px] font-medium text-black bg-white hover:bg-white/90 rounded-lg w-full sm:w-auto flex items-center justify-center gap-2 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] shadow-[0_0_40px_rgba(255,255,255,0.1)]"
             >
-              <span className="flex items-center gap-2">
-                <Brain size={18} strokeWidth={2} />
-                Generate with AI
-                <ArrowRight
-                  size={18}
-                  strokeWidth={2}
-                  className="group-hover:translate-x-0.5 transition-transform duration-300"
-                />
-              </span>
+              <Brain size={18} strokeWidth={2} />
+              Generate with AI
+              <ArrowRight
+                size={18}
+                strokeWidth={2}
+                className="group-hover:translate-x-0.5 transition-transform duration-300"
+              />
             </button>
-
-            {/* Build Manually — also gates on DB */}
             <button
               onClick={() => requireDb("manual")}
-              className="group px-6 py-3 text-[14px] font-medium text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] rounded-lg backdrop-blur-xl flex items-center gap-2 transition-all duration-300 w-full sm:w-auto justify-center hover:scale-[1.02] active:scale-[0.98]"
+              className="group px-6 py-3 text-[14px] font-medium text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] rounded-lg backdrop-blur-xl flex items-center justify-center gap-2 transition-all duration-300 w-full sm:w-auto hover:scale-[1.02] active:scale-[0.98]"
             >
               <Play size={18} strokeWidth={2} />
               Build Manually
             </button>
           </div>
         </div>
-
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-fade-in animation-delay-500">
+        <div className="absolute bottom-6 sm:bottom-8 left-1/2 -translate-x-1/2 animate-fade-in animation-delay-500">
           <div className="w-5 h-9 rounded-full border border-white/[0.12] flex items-start justify-center p-1.5 backdrop-blur-xl bg-white/[0.02]">
             <div className="w-0.5 h-2 bg-white/40 rounded-full animate-scroll" />
           </div>
         </div>
       </section>
 
-      {/* ── STEP 1: DB Connect Modal ─────────────────────────────────────────── */}
+      {/* ── DB Connect Modal ─────────────────────────────────────────────── */}
       {showDbModal && (
         <>
           <div
@@ -451,16 +458,14 @@ export default function LandingPage() {
             }}
             className="fixed inset-0 bg-black/80 backdrop-blur-xl z-[100] animate-lp-fade"
           />
-          <div className="fixed inset-0 z-[101] flex items-center justify-center p-4 animate-lp-modal">
+          <div className="fixed inset-0 z-[101] flex items-center justify-center p-3 sm:p-4 animate-lp-modal">
             <div className="relative w-full max-w-lg">
               <div className="absolute inset-0 bg-white/[0.02] rounded-2xl blur-3xl" />
-              <div className="relative bg-[#090909]/98 border border-white/[0.1] rounded-2xl shadow-2xl backdrop-blur-2xl overflow-hidden">
+              <div className="relative bg-[#090909]/98 border border-white/[0.1] rounded-2xl shadow-2xl backdrop-blur-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
                 <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-white/[0.15] to-transparent" />
-
-                {/* Header */}
-                <div className="px-6 py-5 border-b border-white/[0.05] flex items-center justify-between">
+                <div className="px-5 sm:px-6 py-4 sm:py-5 border-b border-white/[0.05] flex items-center justify-between sticky top-0 bg-[#090909]/98 z-10">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-white/[0.05] border border-white/[0.08] flex items-center justify-center">
+                    <div className="w-8 h-8 rounded-lg bg-white/[0.05] border border-white/[0.08] flex items-center justify-center shrink-0">
                       <Database
                         size={15}
                         strokeWidth={1.5}
@@ -485,16 +490,15 @@ export default function LandingPage() {
                       }
                     }}
                     disabled={isConnecting}
-                    className="p-1.5 hover:bg-white/[0.06] rounded-lg transition-all duration-200 disabled:opacity-30"
+                    className="p-1.5 hover:bg-white/[0.06] rounded-lg transition-all duration-200 disabled:opacity-30 shrink-0"
                   >
                     <X size={15} className="text-white/40" strokeWidth={1.5} />
                   </button>
                 </div>
 
-                <div className="p-6">
+                <div className="p-5 sm:p-6">
                   {connectPhase === "idle" || connectPhase === "error" ? (
                     <div className="space-y-4">
-                      {/* Label */}
                       <div>
                         <label className="block text-[11px] text-white/30 mb-2 tracking-wider uppercase font-medium">
                           Connection label
@@ -507,7 +511,6 @@ export default function LandingPage() {
                           className="w-full px-3.5 py-2.5 bg-white/[0.03] border border-white/[0.07] hover:border-white/[0.11] rounded-lg text-[13px] text-white placeholder-white/20 focus:outline-none focus:border-white/[0.16] transition-all duration-200"
                         />
                       </div>
-                      {/* URI */}
                       <div>
                         <label className="block text-[11px] text-white/30 mb-2 tracking-wider uppercase font-medium">
                           MongoDB URI
@@ -525,7 +528,6 @@ export default function LandingPage() {
                           className="w-full px-3.5 py-2.5 bg-white/[0.03] border border-white/[0.07] hover:border-white/[0.11] rounded-lg text-[13px] text-white placeholder-white/20 font-mono focus:outline-none focus:border-white/[0.16] transition-all duration-200"
                         />
                       </div>
-
                       {connectError && (
                         <div className="flex items-start gap-2.5 px-3.5 py-3 bg-red-500/[0.06] border border-red-500/[0.12] rounded-lg animate-lp-fade">
                           <AlertCircle
@@ -538,18 +540,16 @@ export default function LandingPage() {
                           </p>
                         </div>
                       )}
-
-                      <div className="flex items-center gap-1.5 text-[11px] text-white/20 px-0.5">
+                      <div className="flex items-center gap-1.5 text-[11px] text-white/20 px-0.5 flex-wrap">
                         <Zap size={10} strokeWidth={1.5} />
                         <span>We'll verify the connection before saving</span>
-                        <span className="ml-auto flex items-center gap-1.5">
+                        <span className="ml-auto flex items-center gap-1.5 hidden sm:flex">
                           <kbd className="px-1.5 py-0.5 bg-white/[0.04] border border-white/[0.07] rounded text-[10px] font-mono">
                             ⏎
                           </kbd>
                           to connect
                         </span>
                       </div>
-
                       <div className="flex gap-2.5 pt-1">
                         <button
                           onClick={() => {
@@ -564,17 +564,15 @@ export default function LandingPage() {
                         <button
                           onClick={handleConnect}
                           disabled={!dbUri.trim()}
-                          className="flex-1 px-4 py-2.5 text-[13px] font-medium text-black bg-white hover:bg-white/90 rounded-lg flex items-center justify-center gap-2 transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed shadow-[0_0_24px_rgba(255,255,255,0.08)]"
+                          className="flex-1 px-4 py-2.5 text-[13px] font-medium text-black bg-white hover:bg-white/90 rounded-lg flex items-center justify-center gap-2 transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed"
                         >
-                          <Database size={14} strokeWidth={2} />
-                          Connect
+                          <Database size={14} strokeWidth={2} /> Connect
                         </button>
                       </div>
                     </div>
                   ) : (
-                    /* Connecting animation */
                     <div className="py-4">
-                      <div className="text-center mb-8">
+                      <div className="text-center mb-6 sm:mb-8">
                         <div className="relative inline-flex items-center justify-center w-14 h-14 mb-4">
                           {connectPhase !== "done" && (
                             <div className="absolute inset-0 rounded-full bg-white/[0.04] animate-lp-ping" />
@@ -608,7 +606,6 @@ export default function LandingPage() {
                           }
                         </p>
                       </div>
-
                       <div className="space-y-1">
                         {CONNECT_PHASES.filter((p) => p.phase !== "done").map(
                           (p, i) => {
@@ -643,7 +640,7 @@ export default function LandingPage() {
                                   {p.label}
                                 </span>
                                 {current && (
-                                  <span className="ml-auto text-[10px] text-white/20 font-light">
+                                  <span className="ml-auto text-[10px] text-white/20 font-light hidden sm:block">
                                     {p.sub}
                                   </span>
                                 )}
@@ -657,7 +654,7 @@ export default function LandingPage() {
                 </div>
 
                 {(connectPhase === "idle" || connectPhase === "error") && (
-                  <div className="px-6 pb-5">
+                  <div className="px-5 sm:px-6 pb-4 sm:pb-5">
                     <div className="flex items-center gap-2 text-[11px] text-white/20 font-light">
                       <Shield size={11} strokeWidth={1.5} />
                       <span>
@@ -672,7 +669,7 @@ export default function LandingPage() {
         </>
       )}
 
-      {/* ── STEP 2: DB Info Confirm Modal ─────────────────────────────────────── */}
+      {/* ── DB Info Modal ────────────────────────────────────────────────── */}
       {showDbInfoModal && (
         <>
           <div
@@ -682,16 +679,14 @@ export default function LandingPage() {
             }}
             className="fixed inset-0 bg-black/80 backdrop-blur-xl z-[100] animate-lp-fade"
           />
-          <div className="fixed inset-0 z-[101] flex items-center justify-center p-4 animate-lp-modal">
+          <div className="fixed inset-0 z-[101] flex items-center justify-center p-3 sm:p-4 animate-lp-modal">
             <div className="relative w-full max-w-md">
               <div className="absolute inset-0 bg-white/[0.02] rounded-2xl blur-3xl" />
-              <div className="relative bg-[#090909]/98 border border-white/[0.1] rounded-2xl shadow-2xl backdrop-blur-2xl overflow-hidden">
+              <div className="relative bg-[#090909]/98 border border-white/[0.1] rounded-2xl shadow-2xl backdrop-blur-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
                 <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-white/[0.15] to-transparent" />
-
-                {/* Header */}
-                <div className="px-6 py-5 border-b border-white/[0.05] flex items-center justify-between">
+                <div className="px-5 sm:px-6 py-4 sm:py-5 border-b border-white/[0.05] flex items-center justify-between sticky top-0 bg-[#090909]/98 z-10">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-white/[0.05] border border-white/[0.08] flex items-center justify-center">
+                    <div className="w-8 h-8 rounded-lg bg-white/[0.05] border border-white/[0.08] flex items-center justify-center shrink-0">
                       <CheckCircle
                         size={15}
                         strokeWidth={1.5}
@@ -712,29 +707,25 @@ export default function LandingPage() {
                       setShowDbInfoModal(false);
                       setPendingAction(null);
                     }}
-                    className="p-1.5 hover:bg-white/[0.06] rounded-lg transition-all duration-200"
+                    className="p-1.5 hover:bg-white/[0.06] rounded-lg transition-all duration-200 shrink-0"
                   >
                     <X size={15} className="text-white/40" strokeWidth={1.5} />
                   </button>
                 </div>
 
-                {/* DB Info cards */}
-                <div className="p-6 space-y-3">
-                  {/* Label + URI row */}
+                <div className="p-5 sm:p-6 space-y-3">
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="p-3.5 bg-white/[0.02] border border-white/[0.06] rounded-xl space-y-1.5">
+                    <div className="p-3 sm:p-3.5 bg-white/[0.02] border border-white/[0.06] rounded-xl space-y-1.5">
                       <div className="flex items-center gap-1.5 text-[10px] text-white/30 uppercase tracking-wider font-medium">
-                        <Server size={10} strokeWidth={1.5} />
-                        Label
+                        <Server size={10} strokeWidth={1.5} /> Label
                       </div>
                       <p className="text-[13px] text-white/80 font-medium truncate">
                         {dbLabel || "My Database"}
                       </p>
                     </div>
-                    <div className="p-3.5 bg-white/[0.02] border border-white/[0.06] rounded-xl space-y-1.5">
+                    <div className="p-3 sm:p-3.5 bg-white/[0.02] border border-white/[0.06] rounded-xl space-y-1.5">
                       <div className="flex items-center gap-1.5 text-[10px] text-white/30 uppercase tracking-wider font-medium">
-                        <Table2 size={10} strokeWidth={1.5} />
-                        Collections
+                        <Table2 size={10} strokeWidth={1.5} /> Collections
                       </div>
                       <p className="text-[13px] text-white/80 font-medium">
                         {collectionCount} found
@@ -742,12 +733,10 @@ export default function LandingPage() {
                     </div>
                   </div>
 
-                  {/* Masked URI */}
                   {uriMasked && (
-                    <div className="p-3.5 bg-white/[0.02] border border-white/[0.06] rounded-xl space-y-1.5">
+                    <div className="p-3 sm:p-3.5 bg-white/[0.02] border border-white/[0.06] rounded-xl space-y-1.5">
                       <div className="flex items-center gap-1.5 text-[10px] text-white/30 uppercase tracking-wider font-medium">
-                        <Database size={10} strokeWidth={1.5} />
-                        Connection
+                        <Database size={10} strokeWidth={1.5} /> Connection
                       </div>
                       <p className="text-[11px] text-white/50 font-mono truncate">
                         {uriMasked}
@@ -755,12 +744,11 @@ export default function LandingPage() {
                     </div>
                   )}
 
-                  {/* Collection list */}
                   {collectionCount > 0 && (
-                    <div className="p-3.5 bg-white/[0.02] border border-white/[0.06] rounded-xl space-y-2">
+                    <div className="p-3 sm:p-3.5 bg-white/[0.02] border border-white/[0.06] rounded-xl space-y-2">
                       <div className="flex items-center gap-1.5 text-[10px] text-white/30 uppercase tracking-wider font-medium">
-                        <Table2 size={10} strokeWidth={1.5} />
-                        Discovered collections
+                        <Table2 size={10} strokeWidth={1.5} /> Discovered
+                        collections
                       </div>
                       <div className="flex flex-wrap gap-1.5">
                         {Object.keys(schemas)
@@ -782,24 +770,21 @@ export default function LandingPage() {
                     </div>
                   )}
 
-                  {/* Actions */}
-                  <div className="flex gap-2.5 pt-1">
+                  <div className="flex flex-col sm:flex-row gap-2.5 pt-1">
                     <button
                       onClick={() => {
                         setShowDbInfoModal(false);
                         handleDisconnect();
                         setPendingAction(null);
                       }}
-                      className="flex items-center gap-1.5 px-3.5 py-2.5 text-[12px] text-white/30 hover:text-white/60 bg-white/[0.02] hover:bg-white/[0.05] border border-white/[0.06] rounded-lg transition-all duration-200"
+                      className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 text-[12px] text-white/30 hover:text-white/60 bg-white/[0.02] hover:bg-white/[0.05] border border-white/[0.06] rounded-lg transition-all duration-200"
                     >
-                      <Unplug size={13} strokeWidth={1.5} />
-                      Disconnect
+                      <Unplug size={13} strokeWidth={1.5} /> Disconnect
                     </button>
-
                     {pendingAction && (
                       <button
                         onClick={proceedWithAction}
-                        className="flex-1 px-4 py-2.5 text-[13px] font-medium text-black bg-white hover:bg-white/90 rounded-lg flex items-center justify-center gap-2 transition-all duration-200 shadow-[0_0_24px_rgba(255,255,255,0.08)]"
+                        className="flex-1 px-4 py-2.5 text-[13px] font-medium text-black bg-white hover:bg-white/90 rounded-lg flex items-center justify-center gap-2 transition-all duration-200"
                       >
                         {pendingAction === "ai" ? (
                           <>
@@ -813,7 +798,6 @@ export default function LandingPage() {
                         <ArrowRight size={14} strokeWidth={2} />
                       </button>
                     )}
-
                     {!pendingAction && (
                       <button
                         onClick={() => setShowDbInfoModal(false)}
@@ -830,7 +814,7 @@ export default function LandingPage() {
         </>
       )}
 
-      {/* ── AI Prompt Modal ───────────────────────────────────────────────────── */}
+      {/* ── AI Prompt Modal ───────────────────────────────────────────────── */}
       {showAIModal && (
         <>
           <div
@@ -840,12 +824,12 @@ export default function LandingPage() {
             }}
             className="fixed inset-0 bg-black/80 backdrop-blur-xl z-[100] animate-lp-fade"
           />
-          <div className="fixed inset-0 z-[101] flex items-center justify-center p-4 animate-lp-modal">
+          <div className="fixed inset-0 z-[101] flex items-center justify-center p-3 sm:p-4 animate-lp-modal">
             <div className="relative w-full max-w-2xl">
               <div className="absolute inset-0 bg-white/[0.03] rounded-2xl blur-3xl" />
               <div className="relative bg-[#0A0A0A]/95 border border-white/[0.12] rounded-2xl shadow-2xl backdrop-blur-2xl overflow-hidden">
                 <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-                <div className="px-6 py-5 border-b border-white/[0.06] flex items-center justify-between">
+                <div className="px-5 sm:px-6 py-4 sm:py-5 border-b border-white/[0.06] flex items-center justify-between">
                   <div>
                     <h3 className="text-[15px] font-medium text-white tracking-tight">
                       Generate API Workflow
@@ -864,7 +848,7 @@ export default function LandingPage() {
                     <X size={16} className="text-white/40" strokeWidth={1.5} />
                   </button>
                 </div>
-                <div className="p-6">
+                <div className="p-5 sm:p-6">
                   <div className="mb-4">
                     <label className="block text-[12px] text-white/40 mb-2.5 font-medium tracking-wide uppercase">
                       API Description
@@ -877,24 +861,24 @@ export default function LandingPage() {
                         placeholder="Create a login API with email validation, password hashing, and JWT token generation"
                         disabled={isGenerating}
                         autoFocus
-                        className="w-full h-32 px-4 py-3 bg-white/[0.03] border border-white/[0.08] hover:border-white/[0.12] rounded-xl text-[14px] text-white placeholder-white/20 resize-none focus:outline-none focus:border-white/[0.16] focus:bg-white/[0.04] transition-all duration-300 backdrop-blur-xl"
+                        className="w-full h-28 sm:h-32 px-4 py-3 bg-white/[0.03] border border-white/[0.08] hover:border-white/[0.12] rounded-xl text-[14px] text-white placeholder-white/20 resize-none focus:outline-none focus:border-white/[0.16] focus:bg-white/[0.04] transition-all duration-300 backdrop-blur-xl"
                       />
                       <div className="absolute bottom-3 right-3 text-[10px] text-white/20 font-mono">
                         {aiPrompt.length}/500
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between text-[11px] text-white/30 mb-6 px-0.5">
-                    <span className="flex items-center gap-2">
+                  <div className="flex items-center justify-between text-[11px] text-white/30 mb-5 sm:mb-6 px-0.5">
+                    <span className="flex items-center gap-1.5 sm:gap-2">
                       <kbd className="px-2 py-1 bg-white/[0.04] border border-white/[0.08] rounded text-[10px] font-mono">
                         ⏎
                       </kbd>{" "}
-                      to generate
-                      <span className="text-white/10">•</span>
-                      <kbd className="px-2 py-1 bg-white/[0.04] border border-white/[0.08] rounded text-[10px] font-mono">
+                      generate
+                      <span className="text-white/10 hidden sm:inline">•</span>
+                      <kbd className="px-2 py-1 bg-white/[0.04] border border-white/[0.08] rounded text-[10px] font-mono hidden sm:inline">
                         ESC
-                      </kbd>{" "}
-                      to close
+                      </kbd>
+                      <span className="hidden sm:inline">close</span>
                     </span>
                     <span className="flex items-center gap-1.5 font-medium tracking-wide">
                       <div className="w-1 h-1 rounded-full bg-white/40 animate-pulse-subtle" />
@@ -908,24 +892,23 @@ export default function LandingPage() {
                         setAiPrompt("");
                       }}
                       disabled={isGenerating}
-                      className="flex-1 px-4 py-2.5 text-[13px] font-medium text-white/50 hover:text-white bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.08] rounded-lg transition-all duration-300 disabled:opacity-50 backdrop-blur-xl"
+                      className="flex-1 px-4 py-2.5 text-[13px] font-medium text-white/50 hover:text-white bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.08] rounded-lg transition-all duration-300 disabled:opacity-50"
                     >
                       Cancel
                     </button>
                     <button
                       onClick={handleGenerateClick}
                       disabled={!aiPrompt.trim() || isGenerating}
-                      className="flex-1 px-4 py-2.5 text-[13px] font-medium text-black bg-white hover:bg-white/90 rounded-lg flex items-center justify-center gap-2 transition-all duration-300 disabled:opacity-40 shadow-[0_0_30px_rgba(255,255,255,0.15)]"
+                      className="flex-1 px-4 py-2.5 text-[13px] font-medium text-black bg-white hover:bg-white/90 rounded-lg flex items-center justify-center gap-2 transition-all duration-300 disabled:opacity-40"
                     >
                       {isGenerating ? (
                         <>
-                          <div className="w-3.5 h-3.5 border-2 border-black/20 border-t-black rounded-full animate-spin" />
+                          <div className="w-3.5 h-3.5 border-2 border-black/20 border-t-black rounded-full animate-spin" />{" "}
                           Generating...
                         </>
                       ) : (
                         <>
-                          <Brain size={15} strokeWidth={2} />
-                          Generate Workflow
+                          <Brain size={15} strokeWidth={2} /> Generate Workflow
                         </>
                       )}
                     </button>
@@ -938,17 +921,17 @@ export default function LandingPage() {
       )}
 
       {/* How It Works */}
-      <section className="relative py-32 px-6 border-t border-white/[0.03]">
+      <section className="relative py-20 sm:py-32 px-4 sm:px-6 border-t border-white/[0.03]">
         <div className="relative max-w-7xl mx-auto">
-          <div className="text-center mb-20">
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-semibold mb-4 tracking-[-0.02em]">
+          <div className="text-center mb-12 sm:mb-20">
+            <h2 className="text-2xl sm:text-3xl lg:text-5xl font-semibold mb-4 tracking-[-0.02em]">
               How it works
             </h2>
-            <p className="text-lg text-white/30 max-w-2xl mx-auto font-light">
+            <p className="text-base sm:text-lg text-white/30 max-w-2xl mx-auto font-light">
               From idea to production API in minutes
             </p>
           </div>
-          <div className="grid lg:grid-cols-2 gap-4">
+          <div className="grid sm:grid-cols-2 gap-3 sm:gap-4">
             {[
               {
                 step: "01",
@@ -981,14 +964,14 @@ export default function LandingPage() {
             ].map((item, i) => (
               <div
                 key={item.step}
-                className="group relative p-7 bg-white/[0.02] hover:bg-white/[0.04] border border-white/[0.06] hover:border-white/[0.1] rounded-xl transition-all duration-500 backdrop-blur-xl"
+                className="group relative p-5 sm:p-7 bg-white/[0.02] hover:bg-white/[0.04] border border-white/[0.06] hover:border-white/[0.1] rounded-xl transition-all duration-500 backdrop-blur-xl"
                 style={{ animationDelay: `${i * 100}ms` }}
               >
-                <div className="flex items-start gap-5">
+                <div className="flex items-start gap-4 sm:gap-5">
                   <div className="flex-shrink-0">
-                    <div className="w-10 h-10 rounded-lg bg-white/[0.04] border border-white/[0.08] flex items-center justify-center backdrop-blur-xl group-hover:bg-white/[0.06] group-hover:scale-105 transition-all duration-500">
+                    <div className="w-9 sm:w-10 h-9 sm:h-10 rounded-lg bg-white/[0.04] border border-white/[0.08] flex items-center justify-center backdrop-blur-xl group-hover:bg-white/[0.06] group-hover:scale-105 transition-all duration-500">
                       <item.icon
-                        size={18}
+                        size={17}
                         className="text-white/80"
                         strokeWidth={1.5}
                       />
@@ -998,10 +981,10 @@ export default function LandingPage() {
                     <div className="text-[11px] text-white/20 font-mono mb-2 tracking-wider">
                       {item.step}
                     </div>
-                    <h3 className="text-[16px] font-medium mb-2.5 text-white tracking-tight">
+                    <h3 className="text-[15px] sm:text-[16px] font-medium mb-2 sm:mb-2.5 text-white tracking-tight">
                       {item.title}
                     </h3>
-                    <p className="text-[14px] text-white/30 leading-relaxed font-light">
+                    <p className="text-[13px] sm:text-[14px] text-white/30 leading-relaxed font-light">
                       {item.description}
                     </p>
                   </div>
@@ -1013,17 +996,17 @@ export default function LandingPage() {
       </section>
 
       {/* Features */}
-      <section className="relative py-32 px-6 border-t border-white/[0.03]">
+      <section className="relative py-20 sm:py-32 px-4 sm:px-6 border-t border-white/[0.03]">
         <div className="relative max-w-7xl mx-auto">
-          <div className="text-center mb-20">
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-semibold mb-4 tracking-[-0.02em]">
+          <div className="text-center mb-12 sm:mb-20">
+            <h2 className="text-2xl sm:text-3xl lg:text-5xl font-semibold mb-4 tracking-[-0.02em]">
               Powerful features
             </h2>
-            <p className="text-lg text-white/30 max-w-2xl mx-auto font-light">
+            <p className="text-base sm:text-lg text-white/30 max-w-2xl mx-auto font-light">
               Everything you need to build production-ready APIs
             </p>
           </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             {[
               {
                 icon: Database,
@@ -1062,20 +1045,20 @@ export default function LandingPage() {
             ].map((feature, i) => (
               <div
                 key={feature.title}
-                className="group p-7 bg-white/[0.02] hover:bg-white/[0.04] border border-white/[0.06] hover:border-white/[0.1] rounded-xl transition-all duration-500 backdrop-blur-xl"
+                className="group p-5 sm:p-7 bg-white/[0.02] hover:bg-white/[0.04] border border-white/[0.06] hover:border-white/[0.1] rounded-xl transition-all duration-500 backdrop-blur-xl"
                 style={{ animationDelay: `${i * 50}ms` }}
               >
-                <div className="w-9 h-9 rounded-lg bg-white/[0.04] border border-white/[0.08] flex items-center justify-center mb-5 backdrop-blur-xl group-hover:bg-white/[0.06] group-hover:scale-105 transition-all duration-500">
+                <div className="w-8 sm:w-9 h-8 sm:h-9 rounded-lg bg-white/[0.04] border border-white/[0.08] flex items-center justify-center mb-4 sm:mb-5 backdrop-blur-xl group-hover:bg-white/[0.06] group-hover:scale-105 transition-all duration-500">
                   <feature.icon
-                    size={17}
+                    size={16}
                     className="text-white/70"
                     strokeWidth={1.5}
                   />
                 </div>
-                <h3 className="text-[15px] font-medium mb-2.5 text-white tracking-tight">
+                <h3 className="text-[14px] sm:text-[15px] font-medium mb-2 sm:mb-2.5 text-white tracking-tight">
                   {feature.title}
                 </h3>
-                <p className="text-[14px] text-white/30 leading-relaxed font-light">
+                <p className="text-[13px] sm:text-[14px] text-white/30 leading-relaxed font-light">
                   {feature.description}
                 </p>
               </div>
@@ -1085,23 +1068,21 @@ export default function LandingPage() {
       </section>
 
       {/* CTA */}
-      <section className="relative py-32 px-6 border-t border-white/[0.03]">
+      <section className="relative py-20 sm:py-32 px-4 sm:px-6 border-t border-white/[0.03]">
         <div className="relative max-w-4xl mx-auto">
-          <div className="relative p-16 bg-white/[0.02] border border-white/[0.06] rounded-2xl backdrop-blur-xl overflow-hidden group hover:bg-white/[0.03] hover:border-white/[0.08] transition-all duration-500">
-            <div className="absolute inset-0 bg-gradient-radial from-white/[0.02] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+          <div className="relative p-10 sm:p-16 bg-white/[0.02] border border-white/[0.06] rounded-2xl backdrop-blur-xl overflow-hidden group hover:bg-white/[0.03] hover:border-white/[0.08] transition-all duration-500">
             <div className="relative text-center">
-              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-semibold mb-5 tracking-[-0.02em]">
+              <h2 className="text-2xl sm:text-3xl lg:text-5xl font-semibold mb-4 sm:mb-5 tracking-[-0.02em]">
                 Start building today
               </h2>
-              <p className="text-lg text-white/30 mb-10 max-w-2xl mx-auto font-light">
+              <p className="text-base sm:text-lg text-white/30 mb-8 sm:mb-10 max-w-2xl mx-auto font-light">
                 Join developers building APIs 10× faster with Orchestrix
               </p>
               <button
                 onClick={() => requireDb("ai")}
                 className="px-6 py-3 text-[14px] font-medium text-black bg-white hover:bg-white/90 rounded-lg inline-flex items-center gap-2 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] shadow-[0_0_40px_rgba(255,255,255,0.12)]"
               >
-                Get Started Free
-                <ArrowRight size={18} strokeWidth={2} />
+                Get Started Free <ArrowRight size={18} strokeWidth={2} />
               </button>
             </div>
           </div>
@@ -1109,16 +1090,18 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="relative border-t border-white/[0.03] py-12 px-6">
+      <footer className="relative border-t border-white/[0.03] py-10 sm:py-12 px-4 sm:px-6">
         <div className="relative max-w-7xl mx-auto">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 sm:gap-6">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-white/[0.06] border border-white/[0.12] flex items-center justify-center backdrop-blur-xl">
-                <Workflow size={16} className="text-white" strokeWidth={1.5} />
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-white/[0.06] border border-white/[0.12] flex items-center justify-center backdrop-blur-xl">
+                <Workflow size={14} className="text-white" strokeWidth={1.5} />
               </div>
-              <span className="text-[15px] font-medium">Orchestrix</span>
+              <span className="text-[14px] sm:text-[15px] font-medium">
+                Orchestrix
+              </span>
             </div>
-            <p className="text-[13px] text-white/20 font-light">
+            <p className="text-[12px] sm:text-[13px] text-white/20 font-light">
               © 2025 Orchestrix. All rights reserved.
             </p>
           </div>
@@ -1129,31 +1112,23 @@ export default function LandingPage() {
         @keyframes fade-in         { from { opacity: 0; } to { opacity: 1; } }
         @keyframes fade-in-up      { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes slide-down      { from { transform: translateY(-100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        @keyframes modal-in        { from { opacity: 0; transform: scale(0.96) translateY(16px); } to { opacity: 1; transform: scale(1) translateY(0); } }
         @keyframes pulse-subtle    { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
         @keyframes scroll          { 0% { transform: translateY(0); opacity: 0; } 50% { opacity: 1; } 100% { transform: translateY(10px); opacity: 0; } }
         @keyframes lp-fade         { from { opacity: 0; } to { opacity: 1; } }
         @keyframes lp-modal        { from { opacity: 0; transform: scale(0.97) translateY(12px); } to { opacity: 1; transform: scale(1) translateY(0); } }
         @keyframes lp-ping         { 75%, 100% { transform: scale(2); opacity: 0; } }
-
         .animate-fade-in        { animation: fade-in   0.8s cubic-bezier(0.16, 1, 0.3, 1); }
         .animate-fade-in-up     { animation: fade-in-up 1s cubic-bezier(0.16, 1, 0.3, 1); }
         .animate-slide-down     { animation: slide-down 0.8s cubic-bezier(0.16, 1, 0.3, 1); }
-        .animate-modal-in       { animation: modal-in  0.4s cubic-bezier(0.16, 1, 0.3, 1); }
         .animate-pulse-subtle   { animation: pulse-subtle 3s ease-in-out infinite; }
         .animate-scroll         { animation: scroll 2.5s ease-in-out infinite; }
         .animate-lp-fade        { animation: lp-fade  0.2s ease-out both; }
         .animate-lp-modal       { animation: lp-modal 0.35s cubic-bezier(0.16, 1, 0.3, 1) both; }
         .animate-lp-ping        { animation: lp-ping  1.4s cubic-bezier(0, 0, 0.2, 1) infinite; }
-
         .animation-delay-100 { animation-delay: 100ms; }
         .animation-delay-200 { animation-delay: 200ms; }
         .animation-delay-300 { animation-delay: 300ms; }
         .animation-delay-500 { animation-delay: 500ms; }
-
-        .bg-noise {
-          background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='3.5' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
-        }
         * { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
       `}</style>
     </div>

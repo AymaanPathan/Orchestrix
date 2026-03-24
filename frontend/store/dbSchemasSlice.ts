@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
 import axios from "axios";
+import { apiUrl } from "../utils/api";
 
 // ----------------------------------
 // Types
@@ -13,7 +14,6 @@ interface DbSchemaState {
   schemas: DbSchemas;
   loading: boolean;
   error: string | null;
-  // NEW: track whether the user has a DB connected at all
   isUserDbConnected: boolean;
   userDbLabel: string | null;
   userDbUriMasked: string | null;
@@ -30,8 +30,6 @@ const initialState: DbSchemaState = {
   isUserDbConnected: false,
   userDbLabel: null,
   userDbUriMasked: null,
-  // In a real app this comes from your auth system (JWT, session, etc.)
-  // For now we derive it from localStorage or a default.
   ownerId:
     typeof window !== "undefined"
       ? (localStorage.getItem("ownerId") ?? "default-owner")
@@ -41,11 +39,6 @@ const initialState: DbSchemaState = {
 // ----------------------------------
 // Thunks
 // ----------------------------------
-
-/**
- * Check if the user has a DB connected, and if so fetch its schemas.
- * Falls back gracefully if not connected.
- */
 export const fetchDbSchemas = createAsyncThunk<
   {
     schemas: DbSchemas;
@@ -57,25 +50,17 @@ export const fetchDbSchemas = createAsyncThunk<
   { rejectValue: string; state: { dbSchemas: DbSchemaState } }
 >("dbSchemas/fetch", async (_, { getState, rejectWithValue }) => {
   const { ownerId } = getState().dbSchemas;
-
   try {
-    // 1. Check connection status
     const statusRes = await axios.get(
-      `http://localhost:3000/user/db/status?ownerId=${ownerId}`,
+      apiUrl(`/user/db/status?ownerId=${ownerId}`),
     );
+    if (!statusRes.data?.connected) return { schemas: {}, connected: false };
 
-    if (!statusRes.data?.connected) {
-      return { schemas: {}, connected: false };
-    }
-
-    // 2. Fetch schemas from user's DB
     const schemaRes = await axios.get(
-      `http://localhost:3000/user/db/schemas?ownerId=${ownerId}`,
+      apiUrl(`/user/db/schemas?ownerId=${ownerId}`),
     );
-
-    if (!schemaRes.data?.schemas) {
+    if (!schemaRes.data?.schemas)
       return rejectWithValue("Invalid schema response");
-    }
 
     return {
       schemas: schemaRes.data.schemas,
@@ -90,10 +75,6 @@ export const fetchDbSchemas = createAsyncThunk<
   }
 });
 
-/**
- * Called after DatabaseConnect.onConnected fires — schemas are already
- * available from that call, so we just inject them directly.
- */
 export const setUserDbConnected = createAsyncThunk<
   { schemas: DbSchemas; label: string; uriMasked?: string },
   { schemas: DbSchemas; label: string; uriMasked?: string }
@@ -123,7 +104,6 @@ export const dbSchemasSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
-    // fetchDbSchemas
     builder
       .addCase(fetchDbSchemas.pending, (state) => {
         state.loading = true;
@@ -142,7 +122,6 @@ export const dbSchemasSlice = createSlice({
         state.error = action.payload || "Something went wrong";
       });
 
-    // setUserDbConnected (instant, no loading)
     builder.addCase(setUserDbConnected.fulfilled, (state, action) => {
       state.schemas = action.payload.schemas;
       state.isUserDbConnected = true;

@@ -16,13 +16,29 @@
   {
     "id": "WorkflowBuilder",
     "config": {
-      "src\\steps\\generateWorkflowWithAi.step.ts": {
-        "x": 0,
+      "src\\steps\\getUserDbStatus.step.ts": {
+        "x": 21,
         "y": 0
+      },
+      "src\\steps\\getUserDbSchema.step.ts": {
+        "x": 12,
+        "y": 151
+      },
+      "src\\steps\\generateWorkflowWithAi.step.ts": {
+        "x": 4,
+        "y": 302
       },
       "src\\steps\\executeWorkflow.step.ts": {
         "x": 5,
         "y": 151
+      },
+      "src\\steps\\disconnectUserDb.step.ts": {
+        "x": 0,
+        "y": 604
+      },
+      "src\\steps\\connectUserDb.step.ts": {
+        "x": 13,
+        "y": 755
       }
     }
   }

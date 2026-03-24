@@ -26,19 +26,18 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
   const startedAt = Date.now();
   const { streams } = ctx;
 
-  const { data, vars = {}, steps, index, executionId } = payload;
+  const { data, vars = {}, steps, index, executionId } = payload as any;
 
+  const ownerId = (payload as any).ownerId || "default-owner";
   const totalSteps = steps?.length || 0;
   const isLastStep = index >= totalSteps - 1;
   const stepId = `input-${index}`;
 
   try {
-    // Console logs
     logStepStart(index, "input");
     logKV("Raw variables config", data?.variables);
     logKV("Incoming vars.input", vars.input);
 
-    // ───────────────── STREAM: STEP STARTED ─────────────────
     await logStepStartStream(streams, {
       executionId,
       stepId,
@@ -49,7 +48,6 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
       input: { variables: data?.variables, incomingVars: vars.input },
     });
 
-    // ───────────────── STREAM: PARSING VARIABLES ─────────────────
     await logStepInfo(streams, {
       executionId,
       stepId,
@@ -60,7 +58,6 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
       data: { variableNames: data?.variables?.map((v: any) => v.name) },
     });
 
-    // ───────────────── STREAM: RESOLVING INPUT ─────────────────
     await logStepInfo(streams, {
       executionId,
       stepId,
@@ -77,7 +74,6 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
 
     logKV("Resolved input", resolvedInput);
 
-    // ───────────────── STREAM: INPUT RESOLVED ─────────────────
     await logStepData(streams, {
       executionId,
       stepId,
@@ -92,7 +88,6 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
       },
     });
 
-    // ───────────────── STREAM: STEP FINISHED ─────────────────
     await logStepSuccess(streams, {
       executionId,
       stepId,
@@ -102,15 +97,12 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
       message: "Input step completed successfully",
       output: resolvedInput,
       data: resolvedInput,
-      metadata: {
-        variableCount: Object.keys(resolvedInput).length,
-      },
+      metadata: { variableCount: Object.keys(resolvedInput).length },
       startedAt,
     });
 
     logSuccess("input", Date.now() - startedAt);
 
-    // ───────────────── STREAM: EXECUTION FINISHED (if last step) ─────────────────
     if (isLastStep) {
       await logExecutionFinished(streams, {
         executionId,
@@ -126,12 +118,12 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
         index: index + 1,
         vars: { ...vars, input: resolvedInput },
         executionId,
+        ownerId,
       },
     });
   } catch (err) {
     logError("input", err);
 
-    // ───────────────── STREAM: STEP ERROR ─────────────────
     await logStepError(streams, {
       executionId,
       stepId,
@@ -139,14 +131,10 @@ export const handler: StepHandler<typeof config> = async (payload, ctx) => {
       stepType: "input",
       totalSteps,
       error: String(err),
-      data: {
-        variables: data?.variables,
-        incomingVars: vars.input,
-      },
+      data: { variables: data?.variables, incomingVars: vars.input },
       startedAt,
     });
 
-    // ───────────────── STREAM: EXECUTION FAILED ─────────────────
     await logExecutionFailed(streams, {
       executionId,
       failedStepIndex: index,
