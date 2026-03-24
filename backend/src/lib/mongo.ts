@@ -7,21 +7,19 @@ import CollectionDefinitionsModel from "../models/CollectionDefinitions.model";
 import { introspectDatabase } from "./schemaIntrospector";
 
 let isConnected = false;
+let schemasSeeded = false;
 
 export async function connectMongo() {
-  if (isConnected && mongoose.connection.readyState === 1) {
-    return;
-  }
+  if (isConnected && mongoose.connection.readyState === 1) return;
 
   if (mongoose.connection.readyState === 0) {
     await mongoose.connect(process.env.MONGODB_URI!, {
-      serverSelectionTimeoutMS: 5000,
+      serverSelectionTimeoutMS: 3000,
+      maxPoolSize: 5,
     });
   }
 
-  if (!mongoose.connection.db) {
-    throw new Error("MongoDB connection established but db not ready");
-  }
+  if (!mongoose.connection.db) throw new Error("DB not ready");
 
   await Promise.all([
     userModel.init(),
@@ -31,16 +29,18 @@ export async function connectMongo() {
     CollectionDefinitionsModel.init(),
   ]);
 
-  const schemas = await introspectDatabase();
-
-  for (const [collectionName, fields] of Object.entries(schemas)) {
-    await CollectionDefinitionsModel.updateOne(
-      { collectionName },
-      { $set: { fields, lastSyncedAt: new Date() } },
-      { upsert: true },
-    );
+  // Only introspect + seed schemas once per process lifetime
+  if (!schemasSeeded) {
+    const schemas = await introspectDatabase();
+    for (const [collectionName, fields] of Object.entries(schemas)) {
+      await CollectionDefinitionsModel.updateOne(
+        { collectionName },
+        { $set: { fields, lastSyncedAt: new Date() } },
+        { upsert: true },
+      );
+    }
+    schemasSeeded = true;
   }
 
   isConnected = true;
-  console.log("✅ MongoDB Connected & Schemas Synced");
 }

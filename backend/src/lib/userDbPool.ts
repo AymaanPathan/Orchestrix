@@ -8,6 +8,7 @@ import { connectMongo } from "./mongo";
 import { decrypt } from "./crypto";
 
 const pool = new Map<string, mongoose.Connection>();
+const MAX_POOL = 5;
 
 interface IUserDbRecord {
   ownerId: string;
@@ -40,41 +41,42 @@ export async function getUserConnection(
   const cached = pool.get(ownerId);
   if (cached && cached.readyState === 1) return cached;
 
+  // Evict oldest entry if at capacity
+  if (pool.size >= MAX_POOL) {
+    const oldestEntry = pool.entries().next();
+    if (!oldestEntry.done) {
+      const [oldestKey, oldestConn] = oldestEntry.value;
+      try {
+        await oldestConn.close();
+      } catch {}
+      pool.delete(oldestKey);
+    }
+  }
+
   await connectMongo();
   const record = await getUserDbModel().findOne({ ownerId }).lean();
-
-  if (!record) {
-    throw new Error(
-      `No database connected for owner "${ownerId}". Please connect your database first.`,
-    );
-  }
+  if (!record) throw new Error(`No database connected for owner "${ownerId}".`);
 
   let uri: string;
   try {
     uri = decrypt(record.encryptedUri);
   } catch {
-    uri = record.encryptedUri; // plain-text fallback
-  }
-
-  if (!uri.startsWith("mongodb://") && !uri.startsWith("mongodb+srv://")) {
-    throw new Error(
-      "Stored database URI is corrupt. Please reconnect your database.",
-    );
+    uri = record.encryptedUri;
   }
 
   const conn = await mongoose
     .createConnection(uri, {
-      serverSelectionTimeoutMS: 10000,
-      connectTimeoutMS: 10000,
+      serverSelectionTimeoutMS: 8000,
+      connectTimeoutMS: 8000,
+      socketTimeoutMS: 30_000, // ADD: don't hold idle sockets
+      maxPoolSize: 3, // ADD: small pool per user conn
       family: 4,
     })
     .asPromise();
 
   pool.set(ownerId, conn);
-
   conn.on("disconnected", () => pool.delete(ownerId));
   conn.on("error", () => pool.delete(ownerId));
-
   return conn;
 }
 

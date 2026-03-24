@@ -1,16 +1,13 @@
-// lib/redis.ts
 import Redis from "ioredis";
-
 const redisUrl = process.env.REDIS_URL || "redis://127.0.0.1:6379";
 
-// Publisher (for publishing logs)
-export const redisPub = new Redis(redisUrl);
+let _pub: Redis | null = null;
 
-// Subscriber (shared across SSE endpoints — we'll subscribe/unsubscribe per-request)
-export const redisSub = new Redis(redisUrl);
+function getPub() {
+  if (!_pub) _pub = new Redis(redisUrl, { lazyConnect: true });
+  return _pub;
+}
 
-// Optional: simple helper to publish
 export async function publishLog(executionId: string, payload: any) {
-  const channel = `wf:${executionId}`;
-  await redisPub.publish(channel, JSON.stringify(payload));
+  await getPub().publish(`wf:${executionId}`, JSON.stringify(payload));
 }
